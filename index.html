@@ -1331,10 +1331,21 @@ function navigateTo(id) {
 /* ═══ SPLASH → ONBOARDING ═══ */
 setTimeout(() => {
   const saved = localStorage.getItem('lokalbisa_user');
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
   if (saved) {
-    APP.user = JSON.parse(saved);
-    loadUserData();
-    showScreen('home');
+    const u = JSON.parse(saved);
+    const acc = accounts[u.phone];
+    // Auto-login hanya valid kalau akun ada di database DAN punya pwHash
+    // Kalau tidak (akun lama sebelum SHA-256), paksa login ulang
+    if (acc && acc.pwHash) {
+      APP.user = u;
+      loadUserData();
+      showScreen('home');
+    } else {
+      // Hapus sesi lama yang tidak valid
+      localStorage.removeItem('lokalbisa_user');
+      showScreen('onboarding');
+    }
   } else {
     showScreen('onboarding');
   }
@@ -1439,15 +1450,29 @@ async function doLogin() {
   const acc = accounts[phoneClean];
   if (!acc) { showToast('⚠ Nomor belum terdaftar, silakan daftar dulu'); return; }
 
+  // Guard: akun lama tanpa pwHash → paksa daftar ulang
+  if (!acc.pwHash) {
+    delete accounts[phoneClean];
+    localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
+    showToast('⚠ Akun lama perlu dibuat ulang, silakan daftar kembali');
+    return;
+  }
+
   try {
     const pwHash = await hashPassword(pass);
-    if (pwHash !== acc.pwHash) { showToast('⚠ Password salah'); return; }
+    if (pwHash !== acc.pwHash) {
+      showToast('⚠ Password salah, coba lagi');
+      document.getElementById('log-pass').value = '';
+      document.getElementById('log-pass').focus();
+      return;
+    }
     APP.user = { name: acc.name, biz: acc.biz, cat: acc.cat, phone: phoneClean, joinDate: acc.joinDate };
     localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
     loadUserData();
     showToast('✅ Berhasil masuk! Halo, ' + acc.name.split(' ')[0] + '!');
     showScreen('home');
   } catch(e) {
+    console.error('Login error:', e);
     showToast('⚠ Gagal login, coba lagi');
   }
 }
