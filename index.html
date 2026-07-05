@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#00E5FF">
 <meta name="description" content="Platform ekspor digital berbasis AI untuk UMKM Indonesia">
 <meta name="mobile-web-app-capable" content="yes">
@@ -664,7 +664,16 @@ select.form-input option{background:var(--surface2);color:var(--white);}
         </div>
         <div class="form-group">
           <label class="form-label">Password</label>
-          <input class="form-input" type="password" id="reg-pass" placeholder="Minimal 8 karakter">
+          <input class="form-input" type="password" id="reg-pass" placeholder="Minimal 8 karakter" oninput="checkPassStrength(this.value)">
+          <div style="margin-top:.5rem;">
+            <div style="display:flex;gap:4px;height:4px;border-radius:4px;overflow:hidden;">
+              <div id="ps1" style="flex:1;background:var(--border);border-radius:4px;transition:.3s;"></div>
+              <div id="ps2" style="flex:1;background:var(--border);border-radius:4px;transition:.3s;"></div>
+              <div id="ps3" style="flex:1;background:var(--border);border-radius:4px;transition:.3s;"></div>
+              <div id="ps4" style="flex:1;background:var(--border);border-radius:4px;transition:.3s;"></div>
+            </div>
+            <div id="ps-label" style="font-size:.65rem;color:var(--muted);margin-top:.3rem;"></div>
+          </div>
         </div>
         <button class="btn-primary" onclick="doRegister()" style="margin-top:.5rem;">🚀 Daftar Sekarang — Gratis!</button>
         <div style="text-align:center;margin-top:1rem;font-size:.75rem;color:var(--muted);">Dengan mendaftar, kamu menyetujui Syarat & Ketentuan serta Kebijakan Privasi LOKALBISA (sesuai UU PDP No. 27/2022)</div>
@@ -1128,6 +1137,9 @@ select.form-input option{background:var(--surface2);color:var(--white);}
       <div class="filter-btn" onclick="filterBuyers('craft',this)">🎨 Kerajinan</div>
       <div class="filter-btn" onclick="filterBuyers('halal',this)">☪️ Halal</div>
       <div class="filter-btn" onclick="filterBuyers('organic',this)">🌿 Organik</div>
+      <div class="filter-btn" onclick="filterBuyers('furniture',this)">🪑 Furnitur</div>
+      <div class="filter-btn" onclick="filterBuyers('cosmetic',this)">💄 Kosmetik</div>
+      <div class="filter-btn" onclick="filterBuyers('digital',this)">💻 Digital</div>
     </div>
     <!-- Buyer cards -->
     <div id="buyer-list"></div>
@@ -1246,6 +1258,9 @@ select.form-input option{background:var(--surface2);color:var(--white);}
 <div id="toast"></div>
 
 <!-- Install prompt -->
+<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;text-align:center;padding:.5rem 1rem;font-size:.8rem;font-weight:600;">
+  📵 Mode Offline — Chat AI tidak tersedia, fitur lain tetap berjalan
+</div>
 <div id="install-prompt" style="display:none;position:fixed;bottom:calc(var(--bottom-h) + .8rem);left:1rem;right:1rem;z-index:800;
   background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;
   box-shadow:0 8px 40px rgba(0,0,0,.5);">
@@ -1275,6 +1290,7 @@ const APP = {
   selectedCountry: 'Jepang',
   eoi: [],
   deferredPrompt: null,
+  chatHistory: [], // multi-turn conversation history untuk Compliance Guide
 };
 
 /* ═══ SPLASH NEURAL CANVAS ═══ */
@@ -1348,38 +1364,102 @@ function switchAuthTab(tab) {
   document.getElementById('form-login').style.display = tab==='login'?'':'none';
 }
 
-/* ═══ REGISTER ═══ */
-function doRegister() {
-  const name = document.getElementById('reg-name').value.trim();
-  const biz = document.getElementById('reg-biz').value.trim();
-  const cat = document.getElementById('reg-cat').value;
-  const phone = document.getElementById('reg-phone').value.trim();
-  if (!name||!biz||!cat||!phone) { showToast('⚠ Lengkapi semua field yang wajib'); return; }
-  APP.user = { name, biz, cat, phone, joinDate: new Date().toLocaleDateString('id') };
-  localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
-  loadUserData();
-  showToast('✅ Akun berhasil dibuat! Selamat datang, ' + name.split(' ')[0] + '!');
-  showScreen('home');
-  // Show install prompt after 3s
-  setTimeout(() => { if(APP.deferredPrompt) document.getElementById('install-prompt').style.display='block'; }, 3000);
+/* ═══ PASSWORD UTILS ═══ */
+function checkPassStrength(val) {
+  const bars = [1,2,3,4].map(i=>document.getElementById('ps'+i));
+  const label = document.getElementById('ps-label');
+  if(!bars[0]||!label) return;
+  let score = 0;
+  if (val.length >= 8) score++;
+  if (/[A-Z]/.test(val)) score++;
+  if (/[0-9]/.test(val)) score++;
+  if (/[^A-Za-z0-9]/.test(val)) score++;
+  const colors = ['','#ef4444','#f97316','#eab308','#22c55e'];
+  const labels = ['','⚠ Lemah','⚠ Cukup','✓ Kuat','✓✓ Sangat Kuat'];
+  bars.forEach((b,i) => b.style.background = i < score ? colors[score] : 'var(--border)');
+  label.textContent = val.length ? labels[score] : '';
+  label.style.color = colors[score] || 'var(--muted)';
 }
 
-function doLogin() {
+async function hashPassword(password) {
+  const salt = 'lokalbisa_salt_v1'; // static salt untuk demo; production pakai random salt per user
+  const enc = new TextEncoder().encode(password + salt);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+/* ═══ REGISTER ═══ */
+async function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const biz  = document.getElementById('reg-biz').value.trim();
+  const cat  = document.getElementById('reg-cat').value;
+  const phone = document.getElementById('reg-phone').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+
+  if (!name||!biz||!cat||!phone||!pass) { showToast('⚠ Lengkapi semua field yang wajib'); return; }
+  if (name.length < 3) { showToast('⚠ Nama lengkap minimal 3 karakter'); return; }
+  const phoneClean = phone.replace(/[\s-]/g,'');
+  if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid (cth: 081234567890)'); return; }
+  if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
+
+  // Cek strength: minimal score 2 (harus ada huruf besar atau angka)
+  const hasUpper = /[A-Z]/.test(pass), hasNum = /[0-9]/.test(pass), hasSym = /[^A-Za-z0-9]/.test(pass);
+  if (!hasUpper && !hasNum) { showToast('⚠ Password harus mengandung huruf besar atau angka'); return; }
+
+  // Cek apakah nomor sudah terdaftar
+  const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  if (existing[phoneClean]) { showToast('⚠ Nomor ini sudah terdaftar, silakan login'); return; }
+
+  try {
+    const pwHash = await hashPassword(pass);
+    // Simpan akun (hash saja, BUKAN password asli)
+    existing[phoneClean] = { pwHash, name, biz, cat, joinDate: new Date().toLocaleDateString('id') };
+    localStorage.setItem('lokalbisa_accounts', JSON.stringify(existing));
+
+    APP.user = { name, biz, cat, phone: phoneClean, joinDate: existing[phoneClean].joinDate };
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    loadUserData();
+    showToast('✅ Akun berhasil dibuat! Selamat datang, ' + name.split(' ')[0] + '!');
+    showScreen('home');
+    setTimeout(() => { if(APP.deferredPrompt) document.getElementById('install-prompt').style.display='block'; }, 3000);
+  } catch(e) {
+    showToast('⚠ Gagal membuat akun, coba lagi');
+  }
+}
+
+async function doLogin() {
   const phone = document.getElementById('log-phone').value.trim();
-  const pass = document.getElementById('log-pass').value;
+  const pass  = document.getElementById('log-pass').value;
   if (!phone||!pass) { showToast('⚠ Lengkapi nomor HP dan password'); return; }
-  // Demo login
-  APP.user = { name: 'Demo Pengguna', biz: 'UMKM Batik Indonesia', cat: 'fashion', phone };
-  localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
-  loadUserData();
-  showToast('✅ Berhasil masuk!');
-  showScreen('home');
+  const phoneClean = phone.replace(/[\s-]/g,'');
+  if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid'); return; }
+  if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
+
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  const acc = accounts[phoneClean];
+  if (!acc) { showToast('⚠ Nomor belum terdaftar, silakan daftar dulu'); return; }
+
+  try {
+    const pwHash = await hashPassword(pass);
+    if (pwHash !== acc.pwHash) { showToast('⚠ Password salah'); return; }
+    APP.user = { name: acc.name, biz: acc.biz, cat: acc.cat, phone: phoneClean, joinDate: acc.joinDate };
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    loadUserData();
+    showToast('✅ Berhasil masuk! Halo, ' + acc.name.split(' ')[0] + '!');
+    showScreen('home');
+  } catch(e) {
+    showToast('⚠ Gagal login, coba lagi');
+  }
 }
 
 function doLogout() {
   if (!confirm('Yakin ingin keluar?')) return;
-  localStorage.clear();
-  APP.user = null; APP.ersScore = null;
+  // Hapus HANYA sesi aktif — jangan hapus lokalbisa_accounts
+  // supaya user tetap bisa login kembali setelah logout
+  localStorage.removeItem('lokalbisa_user');
+  localStorage.removeItem('lokalbisa_ers');
+  localStorage.removeItem('lokalbisa_eoi');
+  APP.user = null; APP.ersScore = null; APP.chatHistory = []; APP.eoi = [];
   showScreen('onboarding');
   APP.onboardSlide = 0; updateSlide();
 }
@@ -1641,7 +1721,9 @@ function selectCountry(el, country) {
   selectedCountry = country;
   document.getElementById('selected-country-display').textContent = el.querySelector('.cf').textContent + ' ' + country;
   APP.selectedCountry = country;
-  showToast('Negara dipilih: ' + country);
+  // Reset history supaya konteks negara baru tidak campur dengan negara sebelumnya
+  APP.chatHistory = [];
+  showToast('Negara dipilih: ' + country + ' — sesi chat direset');
 }
 
 function sendQuickQ(el) {
@@ -1659,16 +1741,44 @@ function sendMessage() {
   appendMsg('user', text);
   appendTyping();
 
-  // Simulate AI response
-  setTimeout(() => {
+  fetchComplianceAnswer(text, selectedCountry, APP.chatHistory).then(reply => {
     removeTyping();
-    const reply = generateComplianceReply(text, selectedCountry);
     appendMsg('ai', reply.text, reply.cite, reply.confidence);
-    // Mark step 2 done
+    // Simpan history untuk multi-turn
+    APP.chatHistory.push({ role: 'user', content: text });
+    APP.chatHistory.push({ role: 'assistant', content: reply.text });
+    // Batasi history 12 pesan (6 turn) supaya tidak terlalu besar
+    if (APP.chatHistory.length > 12) APP.chatHistory = APP.chatHistory.slice(-12);
+
     document.getElementById('step2-status').textContent = '✓ Selesai';
     document.getElementById('step2-status').style.color = 'var(--green)';
     document.getElementById('step2-bar').style.width = '100%';
-  }, 1500 + Math.random()*1000);
+  });
+}
+
+/* ═══ COMPLIANCE BACKEND ═══ */
+const LOKALBISA_API_URL = 'https://YOUR-BACKEND-URL.run.app/api/compliance';
+
+async function fetchComplianceAnswer(question, country, history = []) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(LOKALBISA_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, country, history }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('Backend error ' + res.status);
+    const data = await res.json();
+    if (!data.text) throw new Error('Respons backend tidak valid');
+    return { text: data.text, cite: data.cite || 'AI Compliance Guide LOKALBISA', confidence: data.confidence || 87 };
+  } catch (err) {
+    console.warn('Compliance backend tidak terjangkau, pakai fallback lokal:', err.message);
+    const local = generateComplianceReply(question, country);
+    return { ...local, cite: (local.cite || '') + ' · ⚠ Mode offline' };
+  }
 }
 
 function appendMsg(type, text, cite, confidence) {
@@ -1712,24 +1822,55 @@ function generateComplianceReply(q, country) {
   const lower = q.toLowerCase();
   const replies = {
     'Jepang': {
-      default: { text: `Untuk ekspor ke <b>Jepang 🇯🇵</b>, secara umum kamu membutuhkan:<br><br>📋 <b>Dokumen Wajib:</b><br>• Packing List & Commercial Invoice (dalam Bahasa Inggris/Jepang)<br>• Bill of Lading (B/L) atau Airway Bill<br>• Certificate of Origin (CoO) Form IJEPA — bisa diurus di Kadin<br>• Health Certificate dari BPOM atau Kementan (untuk produk pangan)<br><br>📋 <b>Regulasi MHLW:</b><br>• Food Sanitation Law (FSL) — wajib untuk semua produk pangan<br>• Label wajib dalam Bahasa Jepang (nama produk, bahan, kadaluarsa, produsen)<br>• Sertifikasi Halal diakui tapi tidak wajib (nilai plus besar untuk pasar Muslim Jepang)<br><br>💡 <b>Tips:</b> JETRO Indonesia (Jakarta) menyediakan konsultasi ekspor ke Jepang secara gratis!`, cite: 'Sumber: JETRO Japan Trade Guide · MHLW Japan · Updated: Nov 2024', confidence: 92 },
-      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Jepang 🇯🇵</b>:<br><br>✅ <b>Wajib:</b><br>• JAS (Japan Agricultural Standards) — untuk produk pertanian & olahan<br>• MHLW Food Import Permit — untuk semua produk pangan<br>• Phytosanitary Certificate — untuk produk segar/pertanian<br><br>⭐ <b>Sangat Direkomendasikan:</b><br>• Halal Certificate (MUI Indonesia diakui) — pasar Muslim Jepang tumbuh 20% per tahun<br>• ISO 22000 / HACCP — meningkatkan kepercayaan buyer Jepang signifikan<br><br>💰 <b>Estimasi Biaya:</b><br>• JAS Mark: Rp 15–30 juta<br>• HACCP Certification: Rp 20–50 juta<br>• Halal MUI: Rp 5–15 juta`, cite: 'Sumber: JETRO · MAFF Japan · Kemendag RI · Updated: Okt 2024', confidence: 88 },
-      dokumen: { text: `Dokumen ekspor lengkap ke <b>Jepang 🇯🇵</b>:<br><br>📄 <b>Dokumen Ekspor Utama (wajib):</b><br>1. Commercial Invoice (dalam Bahasa Inggris)<br>2. Packing List (detail produk, ukuran, berat)<br>3. Bill of Lading / Airway Bill<br>4. Certificate of Origin Form IJEPA (→ KADIN)<br>5. Health/Sanitary Certificate (→ BPOM/Kementan)<br><br>📄 <b>Dokumen Tambahan (sesuai produk):</b><br>6. Phytosanitary Certificate (produk pertanian → BBKP)<br>7. Fumigation Certificate (kayu/kerajinan)<br>8. Test Report / Lab Analysis (untuk pangan & kosmetik)<br><br>⚠️ Label kemasan WAJIB dalam Bahasa Jepang (katakana/hiragana)`, cite: 'Sumber: Japan Customs · MHLW · Kemendag RI · Updated: Des 2024', confidence: 94 },
+      default: { text: `Untuk ekspor ke <b>Jepang 🇯🇵</b>, secara umum kamu membutuhkan:<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice & Packing List (Bahasa Inggris/Jepang)<br>• Bill of Lading / Airway Bill<br>• Certificate of Origin Form IJEPA — diurus di Kadin<br>• Health Certificate dari BPOM/Kementan (untuk pangan)<br><br>📋 <b>Regulasi MHLW:</b><br>• Food Sanitation Law — wajib untuk semua produk pangan<br>• Label wajib dalam Bahasa Jepang (nama produk, bahan, kadaluarsa)<br>• Sertifikasi Halal tidak wajib tapi nilai plus besar<br><br>💡 <b>Tips:</b> JETRO Indonesia Jakarta menyediakan konsultasi ekspor ke Jepang secara gratis!`, cite: 'Sumber: JETRO Japan · MHLW Japan · Updated: Nov 2024', confidence: 92 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Jepang 🇯🇵</b>:<br><br>✅ <b>Wajib:</b><br>• JAS (Japan Agricultural Standards) — untuk produk pertanian & olahan<br>• MHLW Food Import Permit — semua produk pangan<br>• Phytosanitary Certificate — untuk produk segar/pertanian<br><br>⭐ <b>Sangat Direkomendasikan:</b><br>• Halal Certificate MUI — pasar Muslim Jepang tumbuh 20%/tahun<br>• ISO 22000 / HACCP — meningkatkan kepercayaan buyer secara signifikan<br><br>💰 <b>Estimasi Biaya:</b><br>• JAS Mark: Rp 15–30 juta<br>• HACCP: Rp 20–50 juta<br>• Halal MUI: Rp 5–15 juta`, cite: 'Sumber: JETRO · MAFF Japan · Kemendag RI · Updated: Okt 2024', confidence: 88 },
+      dokumen: { text: `Dokumen ekspor ke <b>Jepang 🇯🇵</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice (Bahasa Inggris)<br>2. Packing List<br>3. Bill of Lading / Airway Bill<br>4. Certificate of Origin Form IJEPA (→ KADIN)<br>5. Health/Sanitary Certificate (→ BPOM/Kementan)<br><br>📄 <b>Tambahan sesuai produk:</b><br>6. Phytosanitary Certificate (produk pertanian → BBKP)<br>7. Fumigation Certificate (kayu/kerajinan)<br>8. Test Report / Lab Analysis (pangan & kosmetik)<br><br>⚠️ Label kemasan WAJIB dalam Bahasa Jepang`, cite: 'Sumber: Japan Customs · MHLW · Kemendag RI · Updated: Des 2024', confidence: 94 },
     },
     'Amerika': {
-      default: { text: `Untuk ekspor ke <b>Amerika Serikat 🇺🇸</b>:<br><br>📋 <b>Dokumen Utama:</b><br>• Commercial Invoice & Packing List<br>• Bill of Lading / Airway Bill<br>• Customs Bond (untuk nilai > USD 2.500)<br>• FDA Prior Notice — WAJIB untuk semua produk pangan<br><br>📋 <b>Regulasi Kunci:</b><br>• FDA 21 CFR — standar keamanan pangan & kosmetik<br>• CPSC Standards — untuk produk konsumer & mainan<br>• FCC Certification — untuk produk elektronik<br>• Label dalam Bahasa Inggris wajib dengan Nutrition Facts<br><br>💡 Gunakan <b>Customs Broker</b> Amerika untuk proses bea cukai — wajib untuk UMKM pemula`, cite: 'Sumber: CBP.gov · FDA.gov · USTR · Updated: Nov 2024', confidence: 91 },
-      sertifikasi: { text: `Sertifikasi wajib untuk ekspor ke <b>Amerika 🇺🇸</b>:<br><br>✅ <b>Wajib (Food & Beverage):</b><br>• FDA Food Facility Registration — GRATIS, perbarui tiap 2 tahun<br>• FSMA Compliance (Food Safety Modernization Act)<br>• FDA Prior Notice setiap pengiriman<br><br>✅ <b>Wajib (Kosmetik):</b><br>• FDA Cosmetic Registration<br>• No animal testing compliance<br><br>⭐ <b>Nilai Plus:</b><br>• USDA Organic — premium 20–30% lebih mahal<br>• Non-GMO Project Verified<br>• Fair Trade Certification`, cite: 'Sumber: FDA.gov · USDA · CBP.gov · Updated: Des 2024', confidence: 89 },
-      default2: { text: `Untuk ekspor pangan ke Amerika 🇺🇸, hal terpenting:<br><br>1. Daftarkan fasilitas produksimu ke FDA (gratis online di fda.gov)<br>2. Kirim Prior Notice ke FDA minimal 4 jam sebelum kapal tiba<br>3. Label harus punya: Nutrition Facts panel, allergen declaration, net quantity<br>4. Batas residu pestisida mengikuti EPA standards<br><br>⚠️ Amerika sangat ketat untuk: listeria, salmonella, aflatoxin`, cite: 'Sumber: FDA.gov · Updated: Jan 2025', confidence: 87 }
+      default: { text: `Untuk ekspor ke <b>Amerika Serikat 🇺🇸</b>:<br><br>📋 <b>Dokumen Utama:</b><br>• Commercial Invoice & Packing List<br>• Bill of Lading / Airway Bill<br>• Customs Bond (nilai > USD 2.500)<br>• FDA Prior Notice — WAJIB untuk semua produk pangan<br><br>📋 <b>Regulasi Kunci:</b><br>• FDA 21 CFR — standar keamanan pangan & kosmetik<br>• CPSC Standards — produk konsumer & mainan<br>• Label Bahasa Inggris wajib dengan Nutrition Facts<br><br>💡 Gunakan <b>Customs Broker</b> Amerika untuk bea cukai — sangat disarankan untuk UMKM pemula`, cite: 'Sumber: CBP.gov · FDA.gov · Updated: Nov 2024', confidence: 91 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Amerika 🇺🇸</b>:<br><br>✅ <b>Wajib (Food & Beverage):</b><br>• FDA Food Facility Registration — GRATIS, perbarui tiap 2 tahun<br>• FSMA Compliance (Food Safety Modernization Act)<br>• FDA Prior Notice setiap pengiriman<br><br>✅ <b>Wajib (Kosmetik):</b><br>• FDA Cosmetic Registration<br>• No animal testing compliance<br><br>⭐ <b>Nilai Plus:</b><br>• USDA Organic — premium 20–30% lebih tinggi<br>• Non-GMO Project Verified<br>• Fair Trade Certification`, cite: 'Sumber: FDA.gov · USDA · CBP.gov · Updated: Des 2024', confidence: 89 },
+      dokumen: { text: `Dokumen ekspor ke <b>Amerika 🇺🇸</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice & Packing List<br>2. Bill of Lading / Airway Bill<br>3. FDA Prior Notice (food/beverage)<br>4. Customs Bond<br>5. CBP Entry Summary (Form 7501)<br><br>📄 <b>Tambahan:</b><br>6. USDA Certificate (produk pertanian)<br>7. Fumigation Certificate (kayu)<br>8. Lab Test Report<br><br>⚠️ Impor > USD 800 wajib melalui broker bea cukai resmi`, cite: 'Sumber: CBP.gov · FDA.gov · Updated: Jan 2025', confidence: 90 },
     },
     'Arab Saudi': {
-      default: { text: `Untuk ekspor ke <b>Arab Saudi 🇸🇦</b>:<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice (dalam Bahasa Arab atau Inggris)<br>• Certificate of Origin — dilegalisir Kemendag + KBRI<br>• Health Certificate dari BPOM/Kementan<br>• <b>Halal Certificate — WAJIB untuk semua produk pangan!</b><br>• Packing List & Bill of Lading<br><br>📋 <b>Regulasi SFDA:</b><br>• Saudi Food and Drug Authority approval wajib<br>• Label dalam Bahasa Arab WAJIB<br>• Shelf life minimum: sisa 2/3 dari total masa kadaluarsa saat tiba<br><br>💡 Halal MUI Indonesia diakui oleh GSO (Gulf Standards Organization) — nilai jual sangat besar!`, cite: 'Sumber: SFDA Saudi Arabia · GSO Standards · KBRI Riyadh · Updated: Nov 2024', confidence: 93 },
-      sertifikasi: { text: `Sertifikasi untuk <b>Arab Saudi / Timur Tengah 🇸🇦</b>:<br><br>✅ <b>WAJIB:</b><br>• <b>Halal Certificate (MUI)</b> — diakui JAKIM, GSO, SFDA<br>• SFDA Product Registration — untuk semua produk pangan & kosmetik<br>• GCC Conformity Mark (G-Mark) — untuk produk elektronik & umum<br><br>⭐ <b>Sangat Direkomendasikan:</b><br>• ISO 22000 / HACCP<br>• BRC (British Retail Consortium) certification<br><br>💰 Biaya Halal MUI: Rp 3–15 juta tergantung produk<br>⏱️ Waktu: 1–3 bulan untuk sertifikasi Halal`, cite: 'Sumber: SFDA · GSO · MUI Indonesia · Updated: Des 2024', confidence: 95 }
-    }
+      default: { text: `Untuk ekspor ke <b>Arab Saudi 🇸🇦</b>:<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice (Bahasa Arab atau Inggris)<br>• Certificate of Origin — dilegalisir Kemendag + KBRI<br>• Health Certificate dari BPOM/Kementan<br>• <b>Halal Certificate — WAJIB untuk semua produk pangan!</b><br>• Packing List & Bill of Lading<br><br>📋 <b>Regulasi SFDA:</b><br>• Saudi Food and Drug Authority approval wajib<br>• Label dalam Bahasa Arab WAJIB<br>• Shelf life minimum: sisa 2/3 dari total masa kadaluarsa saat tiba<br><br>💡 Halal MUI Indonesia diakui oleh GSO — nilai jual sangat besar!`, cite: 'Sumber: SFDA Saudi Arabia · GSO Standards · KBRI Riyadh · Updated: Nov 2024', confidence: 93 },
+      sertifikasi: { text: `Sertifikasi untuk <b>Arab Saudi 🇸🇦</b>:<br><br>✅ <b>WAJIB:</b><br>• <b>Halal Certificate MUI</b> — diakui JAKIM, GSO, SFDA<br>• SFDA Product Registration — semua produk pangan & kosmetik<br>• GCC Conformity Mark (G-Mark) — produk elektronik & umum<br><br>⭐ <b>Sangat Direkomendasikan:</b><br>• ISO 22000 / HACCP<br>• BRC (British Retail Consortium)<br><br>💰 Biaya Halal MUI: Rp 3–15 juta tergantung produk<br>⏱️ Waktu: 1–3 bulan`, cite: 'Sumber: SFDA · GSO · MUI Indonesia · Updated: Des 2024', confidence: 95 },
+      dokumen: { text: `Dokumen ekspor ke <b>Arab Saudi 🇸🇦</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice (Bahasa Inggris/Arab)<br>2. Halal Certificate — dilegalisir Kemenag + KBRI<br>3. Certificate of Origin — dilegalisir Kemendag<br>4. Health Certificate dari BPOM<br>5. Packing List & Bill of Lading<br>6. SFDA Prior Notification<br><br>⚠️ <b>Perhatian khusus:</b><br>• Semua dokumen harus diterjemahkan ke Bahasa Arab (tersumpah)<br>• Produk tanpa Halal akan ditolak di bea cukai Saudi`, cite: 'Sumber: SFDA · Saudi Customs · Kemendag RI · Updated: Des 2024', confidence: 93 },
+    },
+    'Malaysia': {
+      default: { text: `Untuk ekspor ke <b>Malaysia 🇲🇾</b>:<br><br>📋 <b>Kabar Baik:</b><br>Malaysia adalah pasar ekspor TERMUDAH pertama untuk UMKM Indonesia karena:<br>• Satu kawasan ASEAN → tarif 0% via AFTA<br>• Kedekatan budaya & bahasa Melayu<br>• Halal MUI diakui oleh JAKIM Malaysia<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice & Packing List<br>• Certificate of Origin Form D (ASEAN) — diurus di Kadin<br>• Halal Certificate MUI (untuk produk pangan)<br>• NPRA Registration (untuk kosmetik)<br><br>💡 Mulai dari Malaysia dulu untuk "coba-coba ekspor" sebelum ke pasar yang lebih jauh!`, cite: 'Sumber: MITI Malaysia · JAKIM · Kemendag RI · Updated: Nov 2024', confidence: 94 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Malaysia 🇲🇾</b>:<br><br>✅ <b>Wajib:</b><br>• Halal Certificate MUI → diakui JAKIM Malaysia<br>• NPRA (National Pharmaceutical Regulatory Agency) — kosmetik & suplemen<br>• MOH Malaysia — produk pangan olahan<br><br>⭐ <b>Keuntungan ASEAN:</b><br>• Sertifikasi BPOM Indonesia diakui di Malaysia untuk kategori tertentu<br>• Tidak perlu re-registration untuk produk makanan umum<br><br>💰 <b>Estimasi Biaya Rendah:</b><br>• JAKIM Halal: Rp 3–8 juta<br>• NPRA Registration: Rp 5–15 juta`, cite: 'Sumber: JAKIM Malaysia · NPRA · MITI · Updated: Des 2024', confidence: 92 },
+      dokumen: { text: `Dokumen ekspor ke <b>Malaysia 🇲🇾</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice & Packing List<br>2. <b>Form D Certificate of Origin (ASEAN)</b> → untuk nikmati tarif 0%<br>3. Halal Certificate MUI (produk pangan)<br>4. Bill of Lading / Airway Bill<br>5. Health Certificate BPOM (produk pangan)<br><br>📄 <b>Tambahan:</b><br>6. NPRA Notification (kosmetik)<br>7. Phytosanitary Certificate (produk segar)<br><br>⚡ <b>Keunggulan:</b> Proses bea cukai Malaysia + Indonesia via ASEAN Single Window lebih cepat & murah!`, cite: 'Sumber: Royal Malaysian Customs · MITI · Kemendag RI · Updated: Jan 2025', confidence: 95 },
+    },
+    'Uni Eropa': {
+      default: { text: `Untuk ekspor ke <b>Uni Eropa 🇪🇺</b>:<br><br>📋 <b>Tantangan Utama:</b><br>Uni Eropa punya standar paling ketat di dunia — tapi harganya juga paling premium!<br><br>📋 <b>Regulasi Wajib:</b><br>• CE Mark — wajib untuk produk manufaktur, elektronik, mainan<br>• REACH Regulation — pembatasan bahan kimia berbahaya (kosmetik/tekstil)<br>• EU Organic Regulation — untuk klaim produk organik<br>• General Food Law (EC 178/2002) — untuk semua produk pangan<br>• Label wajib bahasa negara tujuan (mis. Jerman → Bahasa Jerman)<br><br>💡 Masuk lewat <b>satu negara pintu</b> dulu (Belanda/Jerman) untuk distribusi ke seluruh EU!`, cite: 'Sumber: European Commission · EUR-Lex · ECHA · Updated: Nov 2024', confidence: 88 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Uni Eropa 🇪🇺</b>:<br><br>✅ <b>Wajib (sesuai kategori):</b><br>• CE Mark — manufaktur, elektronik, mainan, alat kesehatan<br>• REACH Compliance — kosmetik, tekstil, kimia<br>• EU Organic (Eurolejf) — klaim produk organik<br>• EUDR (Deforestation Regulation) — kayu, cokelat, kopi, dst.<br><br>⭐ <b>Nilai Plus Signifikan:</b><br>• FSC/SVLK — produk kayu & furnitur<br>• Rainforest Alliance — kopi & kakao<br>• Fairtrade Certification<br><br>⚠️ <b>Penting:</b> EUDR efektif 2025 — produk berbasis hutan harus bisa dibuktikan bebas deforestasi!`, cite: 'Sumber: European Commission · ECHA · EUDR 2023/1115 · Updated: Jan 2025', confidence: 87 },
+      dokumen: { text: `Dokumen ekspor ke <b>Uni Eropa 🇪🇺</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice & Packing List<br>2. Certificate of Origin (Form A / GSP)<br>3. EUR.1 Movement Certificate (jika ada FTA Indonesia-EU)<br>4. CE Declaration of Conformity (produk manufaktur)<br>5. Health Certificate BPOM/Kementan<br>6. TRACES NT Registration (produk hewani/nabati)<br><br>📄 <b>Tambahan:</b><br>7. REACH Technical Dossier (kimia/kosmetik)<br>8. Organic Certificate (jika klaim organik)<br>9. Lab Test Report (EN Standards)<br><br>⚠️ Tunjuk <b>EU Authorised Representative</b> di salah satu negara EU!`, cite: 'Sumber: EUR-Lex · European Commission · Kemendag RI · Updated: Des 2024', confidence: 89 },
+    },
+    'Australia': {
+      default: { text: `Untuk ekspor ke <b>Australia 🇦🇺</b>:<br><br>📋 <b>Regulasi Ketat Biosecurity:</b><br>Australia punya biosecurity paling ketat di dunia — produk pangan & pertanian sangat diperhatikan.<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice & Packing List<br>• Phytosanitary Certificate (BBKP) — untuk produk nabati<br>• AQIS (Australian Quarantine) Import Permit<br>• Health Certificate BPOM<br>• Certificate of Origin (IA-CEPA → tarif 0% untuk banyak produk!)<br><br>📋 <b>Regulasi:</b><br>• FSANZ (Food Standards Australia New Zealand)<br>• Label wajib Bahasa Inggris dengan country of origin<br>• GST 10% untuk impor > AUD 1.000<br><br>💡 Gunakan <b>IA-CEPA</b> (Indonesia-Australia FTA) untuk tarif preferensial!`, cite: 'Sumber: DAFF Australia · FSANZ · DFAT · Updated: Nov 2024', confidence: 90 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Australia 🇦🇺</b>:<br><br>✅ <b>Wajib:</b><br>• AQIS Import Permit — produk pertanian, kayu, kulit<br>• FSANZ Compliance — semua produk pangan<br>• TGA Registration — suplemen & produk kesehatan<br>• ACMA (komunikasi/elektronik)<br><br>⭐ <b>Nilai Plus:</b><br>• Australian Certified Organic (ACO)<br>• Halal Certification (komunitas Muslim AU besar)<br>• Rainforest Alliance (kopi/kakao)<br><br>💡 <b>IA-CEPA Benefit:</b><br>Sejak 2020, banyak produk Indonesia dapat tarif 0% ke Australia — cek daftarnya di Kemendag!`, cite: 'Sumber: DAFF Australia · TGA · FSANZ · IA-CEPA Text · Updated: Des 2024', confidence: 89 },
+      dokumen: { text: `Dokumen ekspor ke <b>Australia 🇦🇺</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice & Packing List<br>2. Bill of Lading / Airway Bill<br>3. <b>Certificate of Origin IA-CEPA</b> → tarif preferensial<br>4. Phytosanitary Certificate (BBKP) — produk tanaman<br>5. Health Certificate BPOM/Kementan<br>6. AQIS Import Permit<br><br>📄 <b>Tambahan:</b><br>7. Fumigation Certificate (kayu & produk kayu — WAJIB)<br>8. Organic Certificate (jika klaim organik)<br>9. Country of Origin Declaration<br><br>⚠️ Produk kayu WAJIB fumigasi methyl bromide sebelum ekspor!`, cite: 'Sumber: DAFF · Australian Border Force · Kemendag RI · Updated: Jan 2025', confidence: 91 },
+    },
+    'Singapura': {
+      default: { text: `Untuk ekspor ke <b>Singapura 🇸🇬</b>:<br><br>📋 <b>Pasar Paling Mudah di ASEAN:</b><br>Singapura adalah hub perdagangan Asia dengan birokrasi paling efisien & transparan.<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice & Packing List<br>• Certificate of Origin Form D (ASEAN) → tarif 0%<br>• SFA (Singapore Food Agency) Import Permit<br>• Health Certificate BPOM (produk pangan)<br><br>📋 <b>Regulasi:</b><br>• Sale of Food Act — standar keamanan pangan<br>• HSA (Health Sciences Authority) — kosmetik & suplemen<br>• Label Bahasa Inggris wajib, kandungan & kadaluarsa<br><br>💡 Singapura juga bagus sebagai <b>re-export hub</b> ke pasar Asia lainnya!`, cite: 'Sumber: Singapore Food Agency · Enterprise Singapore · Updated: Nov 2024', confidence: 93 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Singapura 🇸🇬</b>:<br><br>✅ <b>Wajib:</b><br>• SFA Food Import License<br>• HSA Product License (kosmetik, suplemen, obat)<br>• SCDF Approval (produk berbahaya/mudah terbakar)<br><br>⭐ <b>Nilai Plus:</b><br>• Halal Certificate (MUIS Singapore) — berbeda dari Halal MUI, perlu apply terpisah<br>• BCA Green Mark (produk bangunan)<br>• Singapore Standard (SS) Certification<br><br>💡 <b>Kabar Baik:</b><br>Singapura tidak ada tarif impor untuk sebagian besar produk — hanya GST 9%!`, cite: 'Sumber: SFA Singapore · HSA · Enterprise Singapore · Updated: Des 2024', confidence: 92 },
+      dokumen: { text: `Dokumen ekspor ke <b>Singapura 🇸🇬</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice & Packing List<br>2. Bill of Lading / Airway Bill<br>3. Form D Certificate of Origin (ASEAN) → tarif 0%<br>4. SFA Import Permit (produk pangan)<br>5. Health Certificate BPOM<br><br>📄 <b>Tambahan:</b><br>6. HSA Product Registration (kosmetik/suplemen)<br>7. Halal Certificate (MUIS Singapore) jika klaim halal<br>8. CITES Certificate (produk berbasis satwa liar)<br><br>⚡ Proses bea cukai Singapura via <b>TradeNet</b> — bisa selesai dalam hitungan jam!`, cite: 'Sumber: Singapore Customs · SFA · HSA · Updated: Jan 2025', confidence: 94 },
+    },
+    'Korea': {
+      default: { text: `Untuk ekspor ke <b>Korea Selatan 🇰🇷</b>:<br><br>📋 <b>Peluang Besar:</b><br>Korea tren K-Beauty & K-Food membuka peluang besar untuk produk alam Indonesia.<br><br>📋 <b>Dokumen Wajib:</b><br>• Commercial Invoice & Packing List<br>• Certificate of Origin Form AK (ASEAN-Korea FTA) → tarif preferensial<br>• MFDS Import Declaration (Ministry of Food and Drug Safety)<br>• Health Certificate BPOM/Kementan<br><br>📋 <b>Regulasi:</b><br>• MFDS — standar pangan & kosmetik (sangat ketat untuk bahan pengawet)<br>• KC Mark — produk elektronik & keselamatan konsumen<br>• Label wajib Bahasa Korea (한국어)<br><br>💡 Kolaborasi dengan <b>KOTRA Indonesia</b> untuk akses buyer Korea!`, cite: 'Sumber: MFDS Korea · Korea Customs · KOTRA · Updated: Nov 2024', confidence: 89 },
+      sertifikasi: { text: `Sertifikasi untuk ekspor ke <b>Korea Selatan 🇰🇷</b>:<br><br>✅ <b>Wajib:</b><br>• MFDS Product Registration — pangan, kosmetik, obat<br>• KC Mark — semua produk elektronik & keselamatan<br>• KFDA (sekarang MFDS) approval — produk kesehatan<br><br>⭐ <b>Nilai Plus Besar untuk Korea:</b><br>• Halal Certificate — komunitas Muslim Korea tumbuh, dan buyer Korea suka jual ke pasar Timteng<br>• Vegan/Cruelty-Free Certification — tren besar di Korea<br>• COSMOS Organic (kosmetik)<br><br>💰 Estimasi MFDS Registration: Rp 10–30 juta<br>⏱️ Waktu: 3–6 bulan`, cite: 'Sumber: MFDS Korea · KOTRA · Kemendag RI · Updated: Des 2024', confidence: 87 },
+      dokumen: { text: `Dokumen ekspor ke <b>Korea Selatan 🇰🇷</b>:<br><br>📄 <b>Wajib:</b><br>1. Commercial Invoice & Packing List<br>2. Bill of Lading / Airway Bill<br>3. <b>Certificate of Origin Form AK</b> → ASEAN-Korea FTA, diurus di Kadin<br>4. MFDS Import Declaration<br>5. Health Certificate BPOM/Kementan<br><br>📄 <b>Tambahan:</b><br>6. Lab Test Report (EN/Korean Standards)<br>7. Ingredient List dalam Bahasa Korea (kosmetik)<br>8. KC Test Report (produk elektronik)<br><br>⚠️ Korea SANGAT ketat untuk pewarna buatan & pengawet — pastikan formula produkmu sesuai standar MFDS!`, cite: 'Sumber: Korea Customs · MFDS · KOTRA · Updated: Jan 2025', confidence: 88 },
+    },
   };
 
-  const countryReplies = replies[country] || replies['Jepang'];
-  if(lower.includes('sertifikasi') || lower.includes('sertifikat') || lower.includes('halal') || lower.includes('iso')) return countryReplies.sertifikasi || countryReplies.default;
-  if(lower.includes('dokumen') || lower.includes('syarat') || lower.includes('persyaratan')) return countryReplies.dokumen || countryReplies.default;
+  const countryReplies = replies[country] || {
+    default: { text: `Untuk ekspor ke <b>${country}</b>, berikut panduan umum yang berlaku:<br><br>📋 <b>Dokumen Ekspor Universal:</b><br>• Commercial Invoice & Packing List<br>• Certificate of Origin (diurus di Kadin Indonesia)<br>• Bill of Lading / Airway Bill<br>• Health Certificate dari BPOM/Kementan (untuk pangan)<br><br>📋 <b>Langkah yang Direkomendasikan:</b><br>1. Cek regulasi spesifik negara di portal Kemendag (kemendag.go.id)<br>2. Hubungi KBRI/KJRI di negara tujuan untuk info terkini<br>3. Konsultasi dengan LPEI (Lembaga Pembiayaan Ekspor Indonesia)<br><br>💡 Hubungi <b>Export Center</b> Kemendag terdekat untuk bantuan gratis!`, cite: 'Sumber: Kemendag RI · LPEI · Updated: Jan 2025', confidence: 75 },
+    sertifikasi: { text: `Sertifikasi umum untuk ekspor ke <b>${country}</b>:<br><br>✅ <b>Sertifikasi Dasar yang Diakui Luas:</b><br>• Halal MUI — diakui di 50+ negara dengan mayoritas Muslim<br>• ISO 22000 / HACCP — standar keamanan pangan internasional<br>• BPOM RI — diakui sebagai dasar di banyak negara berkembang<br><br>⭐ <b>Sertifikasi Spesifik:</b><br>Untuk sertifikasi yang spesifik berlaku di ${country}, saya sarankan menghubungi KBRI setempat atau cek portal Kemendag untuk panduan terbaru.<br><br>💡 Layanan konsultasi sertifikasi gratis tersedia di <b>Balai Sertifikasi Industri (BSI)</b> Kemenperin!`, cite: 'Sumber: Kemendag RI · BSI Kemenperin · Updated: Jan 2025', confidence: 72 },
+    dokumen: { text: `Dokumen ekspor ke <b>${country}</b>:<br><br>📄 <b>Dokumen Standar Ekspor Indonesia:</b><br>1. PEB (Pemberitahuan Ekspor Barang) — diurus di Bea Cukai<br>2. Commercial Invoice & Packing List<br>3. Bill of Lading / Airway Bill<br>4. Certificate of Origin — diurus di Kadin setempat<br>5. Health/Sanitary Certificate (BPOM/Kementan) — untuk pangan<br><br>📄 <b>Dokumen Tambahan sesuai negara tujuan:</b><br>Cek persyaratan spesifik ${country} di portal INSW (insw.go.id) atau hubungi KBRI/KJRI.<br><br>⚡ <b>Portal Berguna:</b><br>• insw.go.id — Indonesia National Single Window<br>• kemendag.go.id/ekspor<br>• lpei.go.id — konsultasi pembiayaan ekspor`, cite: 'Sumber: Bea Cukai RI · Kemendag RI · INSW · Updated: Jan 2025', confidence: 75 },
+  };
+
+  if(lower.includes('sertifikasi') || lower.includes('sertifikat') || lower.includes('halal') || lower.includes('iso') || lower.includes('standar')) return countryReplies.sertifikasi || countryReplies.default;
+  if(lower.includes('dokumen') || lower.includes('syarat') || lower.includes('persyaratan') || lower.includes('berkas')) return countryReplies.dokumen || countryReplies.default;
   return countryReplies.default;
 }
 
@@ -1741,6 +1882,24 @@ const BUYERS = [
   { id:4, flag:'🇦🇺', name:'Australian Organic Market', cat:'Supermarket Organik · Melbourne, Australia', score:78, moq:'300 kg/bulan', category:'food organic', payment:'TT 14 days', cert:['BPOM','Organik','AQIS'], tags:['Australian Market','Organic','AQIS'], desc:'Jaringan supermarket organik di Melbourne dan Sydney. Sedang mencari produk organik tropis dari Indonesia: minyak kelapa, rempah, teh herbal.' },
   { id:5, flag:'🇰🇷', name:'K-Beauty Import Co.', cat:'Importir Kosmetik & Skincare · Seoul, Korea', score:75, moq:'500 pcs', category:'cosmetic halal', payment:'L/C 45 days', cert:['BPOM','Halal','KFDA'], tags:['K-Market','KFDA','Halal Kosmetik'], desc:'Spesialis import kosmetik dan skincare halal untuk pasar Korea yang sedang booming. Mencari produk perawatan kulit berbahan alami tropis dengan packaging premium.' },
   { id:6, flag:'🇺🇸', name:'World Craft Gallery', cat:'Marketplace Kerajinan Global · New York, USA', score:71, moq:'50 pcs', category:'craft', payment:'TT 7 days', cert:['CPSC'], tags:['Artisan Market','CPSC','Low MOQ'], desc:'Platform marketplace premium untuk kerajinan tangan unik dari seluruh dunia. MOQ kecil, cocok untuk UMKM pemula ekspor. Fokus produk: batik, anyaman, keramik, perhiasan.' },
+  { id:7, flag:'🇲🇾', name:'Halalan Tayyiban Sdn Bhd', cat:'Distributor F&B Halal · Kuala Lumpur, Malaysia', score:91, moq:'400 kg/bulan', category:'food halal', payment:'TT 21 days', cert:['Halal JAKIM','SNI','NIB'], tags:['Halal JAKIM','ASEAN','Low Tariff'], desc:'Distributor F&B halal terbesar di Malaysia, fokus produk olahan dari Indonesia berkat kedekatan budaya dan kemudahan ASEAN Free Trade. Mencari camilan, bumbu instan, dan minuman kemasan.' },
+  { id:8, flag:'🇸🇬', name:'Lion City Gourmet Pte Ltd', cat:'Importir Makanan Premium · Singapura', score:85, moq:'150 kg/bulan', category:'food', payment:'TT 14 days', cert:['SFA','HACCP'], tags:['Premium F&B','SFA Approved','Fast Shipping'], desc:'Importir makanan premium untuk hotel dan restoran di Singapura. Mencari kopi specialty, rempah premium, dan camilan artisan dari Indonesia dengan kemasan eksklusif.' },
+  { id:9, flag:'🇪🇺', name:'Nordic Craft Collective', cat:'Retailer Furnitur & Dekorasi · Stockholm, Swedia', score:80, moq:'100 pcs', category:'furniture craft', payment:'L/C 45 days', cert:['CE Mark','FSC','REACH'], tags:['Scandinavian Style','FSC Wood','EU Market'], desc:'Kolektif retail furnitur dan dekorasi rumah gaya Skandinavia. Tertarik dengan furnitur rotan dan kayu dari Indonesia yang punya sertifikasi kayu legal (FSC/SVLK).' },
+  { id:10, flag:'🇺🇸', name:'Spice Route Imports Inc.', cat:'Importir Bumbu & Rempah · Los Angeles, USA', score:88, moq:'2 ton/tahun', category:'food', payment:'L/C 30 days', cert:['FDA','Organic'], tags:['FDA Registered','Bulk Order','Long-term'], desc:'Importir rempah dan bumbu Asia untuk jaringan supermarket etnik di pesisir barat AS. Mencari supplier rempah Indonesia jangka panjang dengan kapasitas konsisten.' },
+  { id:11, flag:'🇦🇪', name:'Gulf Halal Distribution FZE', cat:'Distributor Halal · Dubai, UEA', score:86, moq:'800 kg/bulan', category:'food halal', payment:'L/C 45 days', cert:['Halal ESMA','HACCP'], tags:['UEA Hub','Re-export Gulf','Halal Wajib'], desc:'Distributor halal berbasis di Dubai yang mensuplai ke seluruh kawasan Teluk. Cocok untuk UMKM yang ingin satu pintu masuk ke banyak negara Timur Tengah sekaligus.' },
+  { id:12, flag:'🇰🇷', name:'Seoul Hanbok & Textile', cat:'Importir Tekstil & Fashion · Seoul, Korea', score:73, moq:'300 pcs', category:'fashion craft', payment:'TT 30 days', cert:['KC Mark'], tags:['Textile','Batik Interest','Mid MOQ'], desc:'Importir tekstil yang mulai melirik motif batik dan tenun Indonesia untuk lini fashion kontemporer Korea. Tertarik kolaborasi desain jangka panjang.' },
+  { id:13, flag:'🇬🇧', name:'British Artisan Trading Co.', cat:'Retailer Kerajinan Premium · London, Inggris', score:77, moq:'80 pcs', category:'craft', payment:'TT 14 days', cert:['CE Mark','REACH'], tags:['Premium Craft','Low MOQ','UK Market'], desc:'Toko retail premium di London yang mengkurasi kerajinan tangan otentik dari Asia. Menyukai cerita di balik produk (storytelling) untuk pemasaran.' },
+  { id:14, flag:'🇳🇱', name:'Amsterdam Organic Foods BV', cat:'Importir Pangan Organik · Amsterdam, Belanda', score:84, moq:'250 kg/bulan', category:'food organic', payment:'L/C 30 days', cert:['EU Organic','HACCP'], tags:['EU Gateway','Organic Cert','Eco Packaging'], desc:'Importir pangan organik yang juga berfungsi sebagai gerbang distribusi ke seluruh Uni Eropa. Sangat memperhatikan kemasan ramah lingkungan.' },
+  { id:15, flag:'🇨🇦', name:'Maple Halal Foods Ltd', cat:'Distributor F&B Halal · Toronto, Kanada', score:79, moq:'600 kg/bulan', category:'food halal', payment:'TT 30 days', cert:['Halal MUI','CFIA'], tags:['Halal MUI OK','CFIA Approved','Growing Market'], desc:'Distributor halal yang melayani komunitas Muslim yang berkembang pesat di Kanada. Mencari supplier baru di Asia Tenggara untuk diversifikasi sumber.' },
+  { id:16, flag:'🇯🇵', name:'Tokyo Beauty Lab', cat:'Importir Kosmetik Natural · Osaka, Jepang', score:81, moq:'400 pcs', category:'cosmetic', payment:'L/C 45 days', cert:['MHLW','Halal'], tags:['J-Beauty','Natural Ingredient','MHLW'], desc:'Lab kecantikan yang mencari bahan baku dan produk jadi kosmetik berbasis bahan alami tropis seperti VCO, lidah buaya, dan rempah untuk lini skincare baru mereka.' },
+  { id:17, flag:'🇺🇸', name:'EtsyMakers Wholesale Hub', cat:'Marketplace Kerajinan Online · Austin, USA', score:69, moq:'30 pcs', category:'craft fashion', payment:'TT 7 days', cert:[], tags:['Online Marketplace','Very Low MOQ','Beginner Friendly'], desc:'Hub wholesale untuk penjual marketplace online di AS. MOQ sangat kecil, cocok untuk UMKM yang baru pertama kali coba ekspor dan ingin uji pasar dulu.' },
+  { id:18, flag:'🇶🇦', name:'Doha Premium Mart', cat:'Importir F&B Premium Halal · Doha, Qatar', score:83, moq:'500 kg/bulan', category:'food halal', payment:'L/C 60 days', cert:['Halal','QS Mark'], tags:['Premium Halal','High Margin','Gulf Market'], desc:'Importir untuk jaringan minimarket premium di Qatar. Fokus pada produk halal kelas atas dengan margin tinggi, termasuk kopi dan camilan kemasan eksklusif.' },
+  { id:19, flag:'🇩🇪', name:'Berlin Digital Solutions GmbH', cat:'Buyer Jasa Digital & Animasi · Berlin, Jerman', score:72, moq:'Per proyek', category:'digital creative', payment:'TT per milestone', cert:[], tags:['Remote Service','Project-based','EU Client'], desc:'Agensi digital di Jerman yang rutin mencari mitra outsourcing untuk jasa animasi, desain UI/UX, dan pengembangan software dari talenta Asia Tenggara.' },
+  { id:20, flag:'🇦🇺', name:'Sydney Home & Living Co.', cat:'Retailer Dekorasi Rumah · Sydney, Australia', score:76, moq:'150 pcs', category:'furniture craft', payment:'TT 21 days', cert:['AQIS'], tags:['Home Decor','AQIS Approved','Mid-size Order'], desc:'Retailer dekorasi rumah dan furnitur kecil di Sydney. Tertarik dengan produk anyaman, lampu hias, dan furnitur ringan yang mudah dikirim via kontainer share.' },
+  { id:21, flag:'🇲🇾', name:'KL Beauty Halal Hub', cat:'Importir Kosmetik Halal · Kuala Lumpur, Malaysia', score:87, moq:'350 pcs', category:'cosmetic halal', payment:'TT 21 days', cert:['Halal JAKIM','NPRA'], tags:['Halal Kosmetik','ASEAN','NPRA Registered'], desc:'Importir kosmetik halal terkemuka di Malaysia, melayani juga ekspor ulang ke Brunei dan Singapura. Mencari skincare dan haircare berbahan alami Indonesia.' },
+  { id:22, flag:'🇺🇸', name:'GreenLeaf Agri Trading', cat:'Importir Hasil Pertanian · Chicago, USA', score:74, moq:'5 ton/tahun', category:'food organic', payment:'L/C 45 days', cert:['USDA Organic','FDA'], tags:['Agri Bulk','USDA Organic','Long-term Contract'], desc:'Trading agribisnis untuk komoditas pertanian olahan dalam volume besar. Mencari kontrak supply jangka panjang untuk kopi, kakao, dan rempah organik.' },
+  { id:23, flag:'🇰🇷', name:'Seoul Creative Studio', cat:'Buyer Animasi & Konten Kreatif · Seoul, Korea', score:70, moq:'Per proyek', category:'digital creative', payment:'TT per milestone', cert:[], tags:['Creative Outsourcing','Project-based','Animation'], desc:'Studio kreatif Korea yang mencari mitra outsourcing animator dan konten kreator Asia Tenggara untuk proyek konten digital dan game ringan.' },
+  { id:24, flag:'🇸🇦', name:'Madinah Fashion House', cat:'Retailer Fashion Muslim · Madinah, Arab Saudi', score:85, moq:'200 pcs', category:'fashion halal', payment:'L/C 30 days', cert:['Halal','SASO'], tags:['Modest Fashion','SASO','Pilgrim Market'], desc:'Retailer fashion muslim yang melayani pasar jamaah haji/umrah dan lokal Arab Saudi. Sangat tertarik dengan batik dan tenun bermotif islami modern.' },
 ];
 
 function renderBuyers(filtered) {
@@ -1859,9 +2018,31 @@ window.addEventListener('appinstalled', () => showToast('✅ LOKALBISA sudah ter
 if('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {
-      console.log('SW registered:', reg.scope);
-    }).catch(e => console.log('SW error:', e));
+      console.log('✅ SW registered:', reg.scope);
+      // Deteksi update SW — kasih tahu user ada versi baru
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if(newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            showToast('🔄 Ada pembaruan LOKALBISA! Tutup & buka ulang untuk update.');
+          }
+        });
+      });
+    }).catch(e => console.warn('SW error:', e));
   });
+
+  // Deteksi offline/online — tampilkan banner
+  function updateOnlineStatus() {
+    const banner = document.getElementById('offline-banner');
+    if(!banner) return;
+    if(navigator.onLine) {
+      banner.style.display = 'none';
+    } else {
+      banner.style.display = 'block';
+    }
+  }
+  window.addEventListener('online', updateOnlineStatus);
+  window.addEventListener('offline', updateOnlineStatus);
 }
 
 /* ═══ INIT ═══ */
