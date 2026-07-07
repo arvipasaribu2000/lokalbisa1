@@ -4,16 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#00E5FF">
-<meta name="description" content="Platform ekspor digital berbasis AI untuk UMKM Indonesia">
+<meta name="description" content="Platform ekspor digital berbasis AI untuk UMKM Indonesia — Export Readiness Score, AI Compliance Guide, Smart Buyer Matching.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LOKALBISA">
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="LOKALBISA — AI Export Launchpad untuk UMKM Indonesia">
+<meta property="og:description" content="Platform ekspor digital berbasis AI untuk UMKM Indonesia — Export Readiness Score, AI Compliance Guide, Smart Buyer Matching.">
+<meta property="og:image" content="icon-512.png">
+<meta property="og:url" content="https://arvipasaribu2000.github.io/lokalbisa1/">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>LOKALBISA — AI Export Launchpad</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;600;700;800&family=Mulish:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 
 <style>
@@ -566,6 +573,9 @@ select.form-input option{background:var(--surface2);color:var(--white);}
 </head>
 <body>
 
+<!-- Connection Status Banner — dikelola oleh script.js -->
+<div id="connection-status" role="status" aria-live="polite" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;color:#fff;text-align:center;padding:.5rem 1rem;font-size:.8rem;font-weight:600;"></div>
+
 <!-- ═══════════════════════════════════════════
      SCREEN 1 — SPLASH
 ═══════════════════════════════════════════ -->
@@ -793,11 +803,11 @@ select.form-input option{background:var(--surface2);color:var(--white);}
     <div style="height:1rem;"></div>
   </div>
   <div class="bottom-nav">
-    <div class="nav-item active" onclick="navigateTo('home')"><div class="nav-icon">🏠</div>Beranda</div>
-    <div class="nav-item" onclick="navigateTo('ers')"><div class="nav-icon">📊</div>ERS</div>
-    <div class="nav-item" onclick="navigateTo('compliance')"><div class="nav-icon">🤖</div>AI Chat</div>
-    <div class="nav-item" onclick="navigateTo('matching')"><div class="nav-icon">🌐</div>Buyer</div>
-    <div class="nav-item" onclick="navigateTo('profile')"><div class="nav-icon">👤</div>Profil</div>
+    <div class="nav-item active" onclick="navigateTo('home')" role="button" aria-label="Beranda — Dashboard utama LOKALBISA"><div class="nav-icon">🏠</div>Beranda</div>
+    <div class="nav-item" onclick="navigateTo('ers')" role="button" aria-label="ERS — Hitung Export Readiness Score"><div class="nav-icon">📊</div>ERS</div>
+    <div class="nav-item" onclick="navigateTo('compliance')" role="button" aria-label="AI Chat — Panduan regulasi ekspor"><div class="nav-icon">🤖</div>AI Chat</div>
+    <div class="nav-item" onclick="navigateTo('matching')" role="button" aria-label="Buyer — Smart Buyer Matching internasional"><div class="nav-icon">🌐</div>Buyer</div>
+    <div class="nav-item" onclick="navigateTo('profile')" role="button" aria-label="Profil — Data dan pengaturan akun UMKM"><div class="nav-icon">👤</div>Profil</div>
   </div>
 </div>
 
@@ -1318,6 +1328,8 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + id).classList.add('active');
   APP.currentScreen = id;
+  // Update meta title & description untuk SEO / Lighthouse
+  if (window.updatePageMeta) window.updatePageMeta(id);
 }
 function navigateTo(id) {
   showScreen(id);
@@ -1746,9 +1758,20 @@ function selectCountry(el, country) {
   selectedCountry = country;
   document.getElementById('selected-country-display').textContent = el.querySelector('.cf').textContent + ' ' + country;
   APP.selectedCountry = country;
-  // Reset history supaya konteks negara baru tidak campur dengan negara sebelumnya
+  // Reset history dan bersihkan layar chat supaya tidak campur konteks negara lama
   APP.chatHistory = [];
-  showToast('Negara dipilih: ' + country + ' — sesi chat direset');
+  const chatBox = document.getElementById('chat-messages');
+  if (chatBox) {
+    chatBox.innerHTML = `
+      <div class="msg ai" style="margin-bottom:.5rem;">
+        <div class="msg-bubble">
+          Halo! Saya AI Compliance Guide LOKALBISA 🤖<br><br>
+          Kamu sudah memilih negara tujuan: <b style="color:var(--cyan);">${el.querySelector('.cf').textContent} ${country}</b><br><br>
+          Tanyakan apa saja tentang dokumen ekspor, sertifikasi, regulasi bea cukai, atau standar produk untuk pasar ${country}!
+        </div>
+      </div>`;
+  }
+  showToast('🌍 Negara dipilih: ' + country);
 }
 
 function sendQuickQ(el) {
@@ -2066,8 +2089,7 @@ if('serviceWorker' in navigator) {
       banner.style.display = 'block';
     }
   }
-  window.addEventListener('online', updateOnlineStatus);
-  window.addEventListener('offline', updateOnlineStatus);
+  // online/offline sekarang dikelola oleh script.js
 }
 
 /* ═══ INIT ═══ */
@@ -2075,5 +2097,8 @@ renderBuyers(BUYERS);
 const savedEOI = localStorage.getItem('lokalbisa_eoi');
 if(savedEOI) APP.eoi = JSON.parse(savedEOI);
 </script>
+
+<!-- script.js: SW registration, online/offline, dynamic SEO meta -->
+<script src="./script.js"></script>
 </body>
 </html>

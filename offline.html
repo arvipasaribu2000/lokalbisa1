@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#00E5FF">
+  <title>Offline — LOKALBISA</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #020B18;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+
+    /* Animated background dots */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(0,229,255,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(0,191,165,0.06) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(0,229,255,0.15);
+      border-radius: 1.5rem;
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 100%;
+      position: relative;
+    }
+
+    .icon-wrap {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: rgba(239,68,68,0.12);
+      border: 2px solid rgba(239,68,68,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.5rem;
+      font-size: 2.2rem;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+
+    .brand {
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #00E5FF;
+      text-transform: uppercase;
+      margin-bottom: .5rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: .75rem;
+      line-height: 1.3;
+    }
+
+    p {
+      font-size: .9rem;
+      color: rgba(255,255,255,0.6);
+      line-height: 1.6;
+      margin-bottom: 1.75rem;
+    }
+
+    .btn-retry {
+      background: linear-gradient(135deg, #00E5FF, #00BFA5);
+      color: #020B18;
+      font-weight: 700;
+      font-size: .95rem;
+      border: none;
+      border-radius: .875rem;
+      padding: .875rem 2rem;
+      cursor: pointer;
+      width: 100%;
+      transition: opacity .2s, transform .2s;
+    }
+
+    .btn-retry:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-retry:active { transform: translateY(0); }
+
+    .btn-home {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.7);
+      font-size: .85rem;
+      border-radius: .875rem;
+      padding: .75rem 2rem;
+      cursor: pointer;
+      width: 100%;
+      margin-top: .75rem;
+      transition: border-color .2s;
+    }
+
+    .btn-home:hover { border-color: rgba(0,229,255,0.4); color: #00E5FF; }
+
+    .features {
+      margin-top: 1.75rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      text-align: left;
+    }
+
+    .features p {
+      font-size: .75rem;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: .75rem;
+      text-align: center;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .5rem 0;
+      font-size: .8rem;
+      color: rgba(255,255,255,0.55);
+    }
+
+    .feature-icon { font-size: 1rem; flex-shrink: 0; }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #22c55e;
+      display: inline-block;
+      margin-right: 4px;
+      animation: blink 1.5s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrap" role="img" aria-label="Ikon tidak ada koneksi">📵</div>
+
+    <div class="brand">LOKALBISA</div>
+    <h1>Tidak Ada Koneksi Internet</h1>
+    <p>
+      Sepertinya koneksi internetmu sedang terputus.<br>
+      Periksa Wi-Fi atau data selulermu, lalu coba lagi.
+    </p>
+
+    <button class="btn-retry" onclick="retryConnection()" aria-label="Coba sambungkan kembali">
+      🔄 Coba Lagi
+    </button>
+    <button class="btn-home" onclick="window.location.href='./index.html'" aria-label="Kembali ke halaman utama LOKALBISA">
+      🏠 Kembali ke LOKALBISA
+    </button>
+
+    <div class="features">
+      <p>Fitur yang tetap tersedia saat offline:</p>
+      <div class="feature-item">
+        <span class="feature-icon">📊</span>
+        <span><span class="status-dot"></span>Export Readiness Score (ERS)</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">🔍</span>
+        <span><span class="status-dot"></span>Daftar Buyer Internasional</span>
+      </div>
+      <div class="feature-item">
+        <span class="feature-icon">👤</span>
+        <span><span class="status-dot"></span>Profil & Data UMKM</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function retryConnection() {
+      if (navigator.onLine) {
+        window.location.href = './index.html';
+      } else {
+        window.location.reload();
+      }
+    }
+
+    // Auto redirect kalau koneksi kembali
+    window.addEventListener('online', () => {
+      setTimeout(() => { window.location.href = './index.html'; }, 1000);
+    });
+  </script>
+</body>
+</html>

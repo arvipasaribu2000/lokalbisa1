@@ -1,7 +1,7 @@
 {
   "name": "LOKALBISA — AI Export Launchpad",
   "short_name": "LOKALBISA",
-  "description": "Platform ekspor digital berbasis AI untuk UMKM Indonesia",
+  "description": "Platform ekspor digital berbasis AI untuk UMKM Indonesia — Export Readiness Score, AI Compliance Guide, dan Smart Buyer Matching.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -10,8 +10,8 @@
   "theme_color": "#00E5FF",
   "lang": "id",
   "icons": [
-    { "src": "icon-72.png", "sizes": "72x72", "type": "image/png", "purpose": "any" },
-    { "src": "icon-96.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any" },
+    { "src": "icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any" },
     { "src": "icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any" },
     { "src": "icon-144.png", "sizes": "144x144", "type": "image/png", "purpose": "any" },
     { "src": "icon-152.png", "sizes": "152x152", "type": "image/png", "purpose": "any" },
