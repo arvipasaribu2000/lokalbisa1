@@ -1211,22 +1211,22 @@ select.form-input option{background:var(--surface2);color:var(--white);}
     </div>
     <!-- Menu -->
     <div class="profile-menu">
-      <div class="pmenu-item" onclick="showToast('Fitur edit profil — segera hadir!')">
+      <div class="pmenu-item" onclick="openEditProfile()">
         <div class="pmenu-icon">✏️</div><div class="pmenu-label">Edit Profil Usaha</div><div class="pmenu-arrow">›</div>
       </div>
-      <div class="pmenu-item" onclick="showToast('Upload dokumen sertifikasi — segera hadir!')">
+      <div class="pmenu-item" onclick="openDokumen()">
         <div class="pmenu-icon">📄</div><div class="pmenu-label">Dokumen & Sertifikasi</div><div class="pmenu-arrow">›</div>
       </div>
       <div class="pmenu-item" onclick="navigateTo('ers')">
         <div class="pmenu-icon">📊</div><div class="pmenu-label">Lihat Skor ERS & Roadmap</div><div class="pmenu-arrow">›</div>
       </div>
-      <div class="pmenu-item" onclick="showToast('Upgrade ke Premium — segera hadir!')">
+      <div class="pmenu-item" onclick="openPremium()">
         <div class="pmenu-icon">⭐</div><div class="pmenu-label">Upgrade ke Premium</div><div class="pmenu-arrow">›</div>
       </div>
-      <div class="pmenu-item" onclick="showToast('Pengaturan notifikasi — segera hadir!')">
+      <div class="pmenu-item" onclick="openNotifikasi()">
         <div class="pmenu-icon">🔔</div><div class="pmenu-label">Pengaturan Notifikasi</div><div class="pmenu-arrow">›</div>
       </div>
-      <div class="pmenu-item" onclick="showToast('Privasi & keamanan data — UU PDP 2022')">
+      <div class="pmenu-item" onclick="openPrivasi()">
         <div class="pmenu-icon">🔒</div><div class="pmenu-label">Privasi & Keamanan Data</div><div class="pmenu-arrow">›</div>
       </div>
       <div class="pmenu-item" onclick="doLogout()" style="margin-top:.5rem;border-color:rgba(255,82,82,.3);">
@@ -2096,6 +2096,224 @@ if('serviceWorker' in navigator) {
 renderBuyers(BUYERS);
 const savedEOI = localStorage.getItem('lokalbisa_eoi');
 if(savedEOI) APP.eoi = JSON.parse(savedEOI);
+</script>
+
+<!-- ═══ PROFILE MODALS ═══ -->
+<div id="modal-overlay" onclick="closeProfileModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:2000;backdrop-filter:blur(4px);"></div>
+
+<!-- Edit Profil -->
+<div id="modal-edit-profile" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">✏️ Edit Profil Usaha</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div class="form-group"><label class="form-label">Nama Lengkap</label>
+    <input class="form-input" id="ep-name" placeholder="Nama pemilik usaha"></div>
+  <div class="form-group"><label class="form-label">Nama Usaha</label>
+    <input class="form-input" id="ep-biz" placeholder="Nama bisnis / UMKM"></div>
+  <div class="form-group"><label class="form-label">Kategori Produk</label>
+    <select class="form-input" id="ep-cat">
+      <option value="">-- Pilih Kategori --</option>
+      <option value="food">🍜 Makanan & Minuman</option>
+      <option value="fashion">👘 Fashion & Tekstil</option>
+      <option value="craft">🎨 Kerajinan Tangan</option>
+      <option value="cosmetic">💄 Kosmetik & Perawatan</option>
+      <option value="furniture">🪑 Furnitur & Dekorasi</option>
+      <option value="digital">💻 Produk/Jasa Digital</option>
+    </select></div>
+  <div class="form-group"><label class="form-label">Nomor WhatsApp</label>
+    <input class="form-input" id="ep-phone" type="tel" placeholder="08xxxxxxxxxx"></div>
+  <div class="form-group"><label class="form-label">Deskripsi Usaha</label>
+    <textarea class="form-input" id="ep-desc" rows="3" placeholder="Ceritakan produk unggulan dan keunikan usahamu..." style="resize:none;"></textarea></div>
+  <div class="form-group"><label class="form-label">Kota / Kabupaten</label>
+    <input class="form-input" id="ep-city" placeholder="cth: Jakarta Selatan, Bandung, Yogyakarta"></div>
+  <button class="btn-primary" onclick="saveEditProfile()" style="margin-top:.5rem;">💾 Simpan Perubahan</button>
+</div>
+
+<!-- Dokumen & Sertifikasi -->
+<div id="modal-dokumen" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">📄 Dokumen & Sertifikasi</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;">Centang dokumen yang sudah kamu miliki. Data ini digunakan untuk menghitung skor kesiapan ekspor.</p>
+  <div id="dok-list"></div>
+  <button class="btn-primary" onclick="saveDokumen()" style="margin-top:1rem;">💾 Simpan Status Dokumen</button>
+</div>
+
+<!-- Premium -->
+<div id="modal-premium" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#FFD700;">⭐ Upgrade ke Premium</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div style="background:linear-gradient(135deg,rgba(255,215,0,.08),rgba(0,229,255,.08));border:1px solid rgba(255,215,0,.2);border-radius:1rem;padding:1.25rem;margin-bottom:1rem;text-align:center;">
+    <div style="font-size:2rem;margin-bottom:.5rem;">👑</div>
+    <div style="font-size:1.5rem;font-weight:800;color:#FFD700;">Rp 99.000<span style="font-size:.85rem;font-weight:400;color:var(--muted);">/bulan</span></div>
+    <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem;">Batalkan kapan saja</div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.25rem;">
+    ${['✅ ERS Assessment tidak terbatas','✅ Chat AI Compliance Guide tidak terbatas (100+ pertanyaan/bulan)','✅ Priority Buyer Matching — akses ke 200+ buyer eksklusif','✅ Export Roadmap personal dengan mentor virtual','✅ Notifikasi peluang buyer baru real-time','✅ Badge "UMKM Ekspor Terverifikasi" di profil','✅ Dukungan prioritas via WhatsApp'].map(f=>`<div style="font-size:.85rem;color:rgba(255,255,255,.85);">${f}</div>`).join('')}
+  </div>
+  <button class="btn-primary" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;" onclick="showToast('🚀 Fitur pembayaran segera hadir! Hubungi kami via WhatsApp untuk early access.');closeProfileModal();">⭐ Mulai Premium Sekarang</button>
+  <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">Pertanyaan? Chat kami di WhatsApp</div>
+</div>
+
+<!-- Notifikasi -->
+<div id="modal-notifikasi" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">🔔 Pengaturan Notifikasi</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div id="notif-list"></div>
+  <button class="btn-primary" onclick="saveNotifikasi()" style="margin-top:1rem;">💾 Simpan Pengaturan</button>
+</div>
+
+<!-- Privasi -->
+<div id="modal-privasi" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">🔒 Privasi & Keamanan Data</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div style="font-size:.85rem;color:rgba(255,255,255,.75);line-height:1.7;display:flex;flex-direction:column;gap:1rem;">
+    <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.1);border-radius:.75rem;padding:1rem;">
+      <div style="font-weight:700;color:#00E5FF;margin-bottom:.5rem;">🛡 Perlindungan Data Pribadi</div>
+      LOKALBISA mematuhi <strong>UU PDP No. 27 Tahun 2022</strong>. Seluruh data pribadi kamu diproses berdasarkan persetujuan dan hanya untuk keperluan layanan ekspor.
+    </div>
+    <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.1);border-radius:.75rem;padding:1rem;">
+      <div style="font-weight:700;color:#00E5FF;margin-bottom:.5rem;">💾 Data yang Kami Simpan</div>
+      Nama, nomor WhatsApp (ter-hash), kategori produk, skor ERS, dan riwayat EOI. Password disimpan sebagai SHA-256 hash — tidak pernah dalam bentuk teks asli.
+    </div>
+    <div style="background:rgba(0,229,255,.05);border:1px solid rgba(0,229,255,.1);border-radius:.75rem;padding:1rem;">
+      <div style="font-weight:700;color:#00E5FF;margin-bottom:.5rem;">🚫 Hak Hapus Data</div>
+      Kamu berhak meminta penghapusan seluruh data kapan saja.
+    </div>
+  </div>
+  <button onclick="confirmDeleteData()" style="width:100%;margin-top:1.25rem;padding:.875rem;border-radius:.875rem;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.08);color:#ff5252;font-weight:600;cursor:pointer;font-size:.9rem;">🗑 Hapus Semua Data Saya</button>
+  <button class="btn-primary" onclick="closeProfileModal()" style="margin-top:.75rem;">Tutup</button>
+</div>
+
+<script>
+/* ═══ PROFILE MODAL FUNCTIONS ═══ */
+
+const DOKUMEN_LIST = [
+  { id:'siup', label:'SIUP / NIB (Izin Usaha)', icon:'🏢' },
+  { id:'npwp', label:'NPWP Perusahaan', icon:'📋' },
+  { id:'bpom', label:'Sertifikat BPOM', icon:'💊' },
+  { id:'halal', label:'Sertifikat Halal MUI', icon:'☪️' },
+  { id:'haccp', label:'Sertifikat HACCP / ISO 22000', icon:'🏭' },
+  { id:'snk', label:'SNI (Standar Nasional Indonesia)', icon:'🇮🇩' },
+  { id:'merek', label:'Hak Merek / HKI', icon:'™️' },
+  { id:'rekening', label:'Rekening Bisnis / Devisa', icon:'🏦' },
+  { id:'phyto', label:'Phytosanitary Certificate', icon:'🌿' },
+  { id:'coo', label:'Certificate of Origin (SKA)', icon:'📜' },
+];
+
+const NOTIF_LIST = [
+  { id:'n_buyer', label:'Buyer baru sesuai kategori produkmu', icon:'🌐' },
+  { id:'n_ers', label:'Pengingat update ERS bulanan', icon:'📊' },
+  { id:'n_reg', label:'Perubahan regulasi ekspor', icon:'⚖️' },
+  { id:'n_promo', label:'Promo dan penawaran LOKALBISA', icon:'🎁' },
+];
+
+function openProfileModal(id) {
+  document.getElementById('modal-overlay').style.display = 'block';
+  document.getElementById(id).style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeProfileModal() {
+  document.querySelectorAll('[id^="modal-"]').forEach(m => m.style.display = 'none');
+  document.getElementById('modal-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function openEditProfile() {
+  const u = APP.user || {};
+  const extra = JSON.parse(localStorage.getItem('lokalbisa_profile_extra') || '{}');
+  document.getElementById('ep-name').value  = u.name  || '';
+  document.getElementById('ep-biz').value   = u.biz   || '';
+  document.getElementById('ep-phone').value = u.phone || '';
+  document.getElementById('ep-city').value  = extra.city || '';
+  document.getElementById('ep-desc').value  = extra.desc || '';
+  const cat = document.getElementById('ep-cat');
+  cat.value = u.cat || '';
+  openProfileModal('modal-edit-profile');
+}
+
+function saveEditProfile() {
+  const name  = document.getElementById('ep-name').value.trim();
+  const biz   = document.getElementById('ep-biz').value.trim();
+  const cat   = document.getElementById('ep-cat').value;
+  const phone = document.getElementById('ep-phone').value.trim();
+  const city  = document.getElementById('ep-city').value.trim();
+  const desc  = document.getElementById('ep-desc').value.trim();
+  if (!name||!biz||!cat||!phone) { showToast('⚠ Nama, usaha, kategori, dan nomor wajib diisi'); return; }
+  const phoneClean = phone.replace(/[\s-]/g,'');
+  if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid'); return; }
+  APP.user = { ...APP.user, name, biz, cat, phone: phoneClean };
+  localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+  localStorage.setItem('lokalbisa_profile_extra', JSON.stringify({ city, desc }));
+  loadUserData();
+  closeProfileModal();
+  showToast('✅ Profil berhasil diperbarui!');
+}
+
+function openDokumen() {
+  const saved = JSON.parse(localStorage.getItem('lokalbisa_dokumen') || '{}');
+  const container = document.getElementById('dok-list');
+  container.innerHTML = DOKUMEN_LIST.map(d => `
+    <label style="display:flex;align-items:center;gap:.75rem;padding:.75rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:.75rem;margin-bottom:.5rem;cursor:pointer;">
+      <input type="checkbox" id="dok-${d.id}" ${saved[d.id]?'checked':''} style="width:18px;height:18px;accent-color:#00E5FF;">
+      <span style="font-size:1.1rem;">${d.icon}</span>
+      <span style="font-size:.85rem;color:rgba(255,255,255,.85);">${d.label}</span>
+    </label>`).join('');
+  openProfileModal('modal-dokumen');
+}
+
+function saveDokumen() {
+  const saved = {};
+  DOKUMEN_LIST.forEach(d => { saved[d.id] = document.getElementById('dok-'+d.id)?.checked || false; });
+  localStorage.setItem('lokalbisa_dokumen', JSON.stringify(saved));
+  const count = Object.values(saved).filter(Boolean).length;
+  closeProfileModal();
+  showToast(`✅ ${count}/${DOKUMEN_LIST.length} dokumen tersimpan`);
+}
+
+function openPremium() { openProfileModal('modal-premium'); }
+
+function openNotifikasi() {
+  const saved = JSON.parse(localStorage.getItem('lokalbisa_notif') || '{}');
+  const container = document.getElementById('notif-list');
+  container.innerHTML = NOTIF_LIST.map(n => `
+    <label style="display:flex;align-items:center;justify-content:space-between;padding:.875rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:.75rem;margin-bottom:.5rem;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:.75rem;">
+        <span style="font-size:1.1rem;">${n.icon}</span>
+        <span style="font-size:.85rem;color:rgba(255,255,255,.85);">${n.label}</span>
+      </div>
+      <input type="checkbox" id="notif-${n.id}" ${saved[n.id]!==false?'checked':''} style="width:18px;height:18px;accent-color:#00E5FF;">
+    </label>`).join('');
+  openProfileModal('modal-notifikasi');
+}
+
+function saveNotifikasi() {
+  const saved = {};
+  NOTIF_LIST.forEach(n => { saved[n.id] = document.getElementById('notif-'+n.id)?.checked || false; });
+  localStorage.setItem('lokalbisa_notif', JSON.stringify(saved));
+  closeProfileModal();
+  showToast('✅ Pengaturan notifikasi disimpan');
+}
+
+function openPrivasi() { openProfileModal('modal-privasi'); }
+
+function confirmDeleteData() {
+  if (!confirm('Yakin ingin menghapus semua data? Tindakan ini tidak dapat dibatalkan.')) return;
+  localStorage.clear();
+  APP.user = null; APP.ersScore = null; APP.chatHistory = [];
+  closeProfileModal();
+  showToast('🗑 Semua data berhasil dihapus');
+  setTimeout(() => { showScreen('onboarding'); APP.onboardSlide=0; updateSlide(); }, 1500);
+}
 </script>
 
 <!-- script.js: SW registration, online/offline, dynamic SEO meta -->
