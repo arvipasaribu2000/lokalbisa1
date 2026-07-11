@@ -1288,6 +1288,12 @@ select.form-input option{background:var(--surface2);color:var(--white);}
 <!-- ═══════════════════════════════════════════
      JAVASCRIPT
 ═══════════════════════════════════════════ -->
+<!-- ═══ FIREBASE SDK (compat build — bisa langsung dipakai tanpa bundler) ═══ -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="./firebase-config.js"></script>
+
 <script>
 /* ═══ STATE ═══ */
 const APP = {
@@ -1340,28 +1346,50 @@ function navigateTo(id) {
   document.querySelectorAll('#screen-'+id+' .nav-item').forEach((n,i) => { if(i===idx) n.classList.add('active'); });
 }
 
-/* ═══ SPLASH → ONBOARDING ═══ */
-setTimeout(() => {
-  const saved = localStorage.getItem('lokalbisa_user');
-  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-  if (saved) {
-    const u = JSON.parse(saved);
-    const acc = accounts[u.phone];
-    // Auto-login hanya valid kalau akun ada di database DAN punya pwHash
-    // Kalau tidak (akun lama sebelum SHA-256), paksa login ulang
-    if (acc && acc.pwHash) {
-      APP.user = u;
-      loadUserData();
-      showScreen('home');
-    } else {
-      // Hapus sesi lama yang tidak valid
-      localStorage.removeItem('lokalbisa_user');
-      showScreen('onboarding');
-    }
+/* ═══ FIRESTORE HELPERS ═══ */
+// Nomor HP diubah jadi "email" dummy supaya bisa dipakai Firebase Authentication
+// (Firebase Auth butuh format email, tapi user tetap login pakai nomor HP di UI).
+function phoneToEmail(phoneClean) { return phoneClean + '@lokalbisa.app'; }
+function usersCol() { return db.collection('users'); }
+
+// Ambil dokumen profil user dari Firestore lalu masukkan ke APP.user + state lain
+async function fetchUserDoc(uid) {
+  const snap = await usersCol().doc(uid).get();
+  if (!snap.exists) return null;
+  return { uid, ...snap.data() };
+}
+
+/* ═══ SPLASH → ONBOARDING (AUTO-LOGIN VIA FIREBASE AUTH) ═══ */
+let splashMinTimeDone = false, splashAuthDone = false, splashUserData = null;
+
+function trySplashTransition() {
+  if (!splashMinTimeDone || !splashAuthDone) return;
+  if (splashUserData) {
+    APP.user = splashUserData;
+    loadUserData();
+    showScreen('home');
   } else {
     showScreen('onboarding');
   }
-}, 2200);
+}
+
+setTimeout(() => { splashMinTimeDone = true; trySplashTransition(); }, 2200);
+
+auth.onAuthStateChanged(async (fbUser) => {
+  if (fbUser) {
+    try {
+      const data = await fetchUserDoc(fbUser.uid);
+      splashUserData = data; // null kalau dokumen belum ada (jaga-jaga)
+    } catch (e) {
+      console.error('Gagal ambil profil dari Firestore:', e);
+      splashUserData = null;
+    }
+  } else {
+    splashUserData = null;
+  }
+  splashAuthDone = true;
+  trySplashTransition();
+});
 
 /* ═══ ONBOARDING ═══ */
 function nextSlide() {
@@ -1429,24 +1457,26 @@ async function doRegister() {
   const hasUpper = /[A-Z]/.test(pass), hasNum = /[0-9]/.test(pass), hasSym = /[^A-Za-z0-9]/.test(pass);
   if (!hasUpper && !hasNum) { showToast('⚠ Password harus mengandung huruf besar atau angka'); return; }
 
-  // Cek apakah nomor sudah terdaftar
-  const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-  if (existing[phoneClean]) { showToast('⚠ Nomor ini sudah terdaftar, silakan login'); return; }
-
   try {
-    const pwHash = await hashPassword(pass);
-    // Simpan akun (hash saja, BUKAN password asli)
-    existing[phoneClean] = { pwHash, name, biz, cat, joinDate: new Date().toLocaleDateString('id') };
-    localStorage.setItem('lokalbisa_accounts', JSON.stringify(existing));
+    const joinDate = new Date().toLocaleDateString('id');
+    // Buat akun asli di Firebase Authentication (password di-hash & disimpan aman oleh Firebase, bukan kita)
+    const cred = await auth.createUserWithEmailAndPassword(phoneToEmail(phoneClean), pass);
+    const uid = cred.user.uid;
 
-    APP.user = { name, biz, cat, phone: phoneClean, joinDate: existing[phoneClean].joinDate };
-    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    const profile = { name, biz, cat, phone: phoneClean, joinDate, ers: null, ersData: {}, eoi: [] };
+    await usersCol().doc(uid).set(profile);
+
+    APP.user = { uid, ...profile };
     loadUserData();
     showToast('✅ Akun berhasil dibuat! Selamat datang, ' + name.split(' ')[0] + '!');
     showScreen('home');
     setTimeout(() => { if(APP.deferredPrompt) document.getElementById('install-prompt').style.display='block'; }, 3000);
   } catch(e) {
-    showToast('⚠ Gagal membuat akun, coba lagi');
+    console.error('Register error:', e);
+    if (e.code === 'auth/email-already-in-use') showToast('⚠ Nomor ini sudah terdaftar, silakan login');
+    else if (e.code === 'auth/weak-password') showToast('⚠ Password terlalu lemah, gunakan kombinasi lebih kuat');
+    else if (e.code === 'auth/network-request-failed') showToast('⚠ Tidak ada koneksi internet');
+    else showToast('⚠ Gagal membuat akun, coba lagi');
   }
 }
 
@@ -1458,44 +1488,30 @@ async function doLogin() {
   if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid'); return; }
   if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
 
-  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-  const acc = accounts[phoneClean];
-  if (!acc) { showToast('⚠ Nomor belum terdaftar, silakan daftar dulu'); return; }
-
-  // Guard: akun lama tanpa pwHash → paksa daftar ulang
-  if (!acc.pwHash) {
-    delete accounts[phoneClean];
-    localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
-    showToast('⚠ Akun lama perlu dibuat ulang, silakan daftar kembali');
-    return;
-  }
-
   try {
-    const pwHash = await hashPassword(pass);
-    if (pwHash !== acc.pwHash) {
-      showToast('⚠ Password salah, coba lagi');
-      document.getElementById('log-pass').value = '';
-      document.getElementById('log-pass').focus();
-      return;
-    }
-    APP.user = { name: acc.name, biz: acc.biz, cat: acc.cat, phone: phoneClean, joinDate: acc.joinDate };
-    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    const cred = await auth.signInWithEmailAndPassword(phoneToEmail(phoneClean), pass);
+    const data = await fetchUserDoc(cred.user.uid);
+    if (!data) { showToast('⚠ Profil tidak ditemukan, hubungi admin'); return; }
+    APP.user = data;
     loadUserData();
-    showToast('✅ Berhasil masuk! Halo, ' + acc.name.split(' ')[0] + '!');
+    showToast('✅ Berhasil masuk! Halo, ' + data.name.split(' ')[0] + '!');
     showScreen('home');
   } catch(e) {
     console.error('Login error:', e);
-    showToast('⚠ Gagal login, coba lagi');
+    if (e.code === 'auth/user-not-found') showToast('⚠ Nomor belum terdaftar, silakan daftar dulu');
+    else if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+      showToast('⚠ Password salah, coba lagi');
+      document.getElementById('log-pass').value = '';
+      document.getElementById('log-pass').focus();
+    }
+    else if (e.code === 'auth/network-request-failed') showToast('⚠ Tidak ada koneksi internet');
+    else showToast('⚠ Gagal login, coba lagi');
   }
 }
 
 function doLogout() {
   if (!confirm('Yakin ingin keluar?')) return;
-  // Hapus HANYA sesi aktif — jangan hapus lokalbisa_accounts
-  // supaya user tetap bisa login kembali setelah logout
-  localStorage.removeItem('lokalbisa_user');
-  localStorage.removeItem('lokalbisa_ers');
-  localStorage.removeItem('lokalbisa_eoi');
+  auth.signOut().catch(e => console.error('Logout error:', e));
   APP.user = null; APP.ersScore = null; APP.chatHistory = []; APP.eoi = [];
   showScreen('onboarding');
   APP.onboardSlide = 0; updateSlide();
@@ -1519,11 +1535,16 @@ function loadUserData() {
   const catLabel = {fashion:'Fashion & Tekstil',craft:'Kerajinan',food:'Makanan & Minuman',furniture:'Furnitur',cosmetic:'Kosmetik Halal',agri:'Pertanian',digital:'Jasa Digital',creative:'Kreatif'};
   if (pc) pc.textContent = catLabel[APP.user.cat] || APP.user.cat;
 
-  // Load saved ERS score if any
-  const savedERS = localStorage.getItem('lokalbisa_ers');
-  if (savedERS) {
-    APP.ersScore = parseInt(savedERS);
+  // Load saved ERS score if any (sudah ikut ke-fetch dari Firestore bareng profil)
+  if (APP.user.ers !== undefined && APP.user.ers !== null) {
+    APP.ersScore = APP.user.ers;
     updateHeroScore(APP.ersScore);
+  }
+  if (APP.user.ersData) APP.ersData = APP.user.ersData;
+  if (Array.isArray(APP.user.eoi)) {
+    APP.eoi = APP.user.eoi;
+    const eoiEl = document.getElementById('mini-eoi');
+    if (eoiEl) eoiEl.textContent = APP.eoi.length;
   }
 }
 
@@ -1621,7 +1642,10 @@ function calcERSScore() {
 function showERSResult() {
   const result = calcERSScore();
   APP.ersScore = result.total;
-  localStorage.setItem('lokalbisa_ers', result.total);
+  if (APP.user && APP.user.uid) {
+    usersCol().doc(APP.user.uid).set({ ers: result.total, ersData: APP.ersData }, { merge: true })
+      .catch(e => console.error('Gagal simpan ERS ke Firestore:', e));
+  }
 
   // Hide loading, show result
   document.getElementById('ers-loading').style.display = 'none';
@@ -2019,8 +2043,11 @@ function openBuyerModal(id, e) {
 }
 
 function sendEOI(buyerId) {
-  APP.eoi.push(buyerId);
-  localStorage.setItem('lokalbisa_eoi', JSON.stringify(APP.eoi));
+  if (!APP.eoi.includes(buyerId)) APP.eoi.push(buyerId);
+  if (APP.user && APP.user.uid) {
+    usersCol().doc(APP.user.uid).update({ eoi: firebase.firestore.FieldValue.arrayUnion(buyerId) })
+      .catch(e => console.error('Gagal simpan EOI ke Firestore:', e));
+  }
   const eoi = document.getElementById('mini-eoi');
   if(eoi) eoi.textContent = APP.eoi.length;
   document.getElementById('stat-eoi') && (document.getElementById('stat-eoi').textContent = APP.eoi.length);
@@ -2094,8 +2121,7 @@ if('serviceWorker' in navigator) {
 
 /* ═══ INIT ═══ */
 renderBuyers(BUYERS);
-const savedEOI = localStorage.getItem('lokalbisa_eoi');
-if(savedEOI) APP.eoi = JSON.parse(savedEOI);
+// APP.eoi di-load dari Firestore lewat loadUserData() setiap kali user login/auto-login
 </script>
 
 <!-- ═══ PROFILE MODALS ═══ -->
@@ -2281,18 +2307,17 @@ function closeProfileModal() {
 
 function openEditProfile() {
   const u = APP.user || {};
-  const extra = JSON.parse(localStorage.getItem('lokalbisa_profile_extra') || '{}');
   document.getElementById('ep-name').value  = u.name  || '';
   document.getElementById('ep-biz').value   = u.biz   || '';
   document.getElementById('ep-phone').value = u.phone || '';
-  document.getElementById('ep-city').value  = extra.city || '';
-  document.getElementById('ep-desc').value  = extra.desc || '';
+  document.getElementById('ep-city').value  = u.city || '';
+  document.getElementById('ep-desc').value  = u.desc || '';
   const cat = document.getElementById('ep-cat');
   cat.value = u.cat || '';
   openProfileModal('modal-edit-profile');
 }
 
-function saveEditProfile() {
+async function saveEditProfile() {
   const name  = document.getElementById('ep-name').value.trim();
   const biz   = document.getElementById('ep-biz').value.trim();
   const cat   = document.getElementById('ep-cat').value;
@@ -2302,16 +2327,25 @@ function saveEditProfile() {
   if (!name||!biz||!cat||!phone) { showToast('⚠ Nama, usaha, kategori, dan nomor wajib diisi'); return; }
   const phoneClean = phone.replace(/[\s-]/g,'');
   if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid'); return; }
-  APP.user = { ...APP.user, name, biz, cat, phone: phoneClean };
-  localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
-  localStorage.setItem('lokalbisa_profile_extra', JSON.stringify({ city, desc }));
-  loadUserData();
-  closeProfileModal();
-  showToast('✅ Profil berhasil diperbarui!');
+  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
+  // Catatan: nomor HP di sini cuma field tampilan/kontak.
+  // Nomor yang dipakai untuk LOGIN tetap nomor saat pertama daftar
+  // (mengubahnya butuh alur ganti-email Firebase Auth yang terpisah).
+  const updates = { name, biz, cat, phone: phoneClean, city, desc };
+  try {
+    await usersCol().doc(APP.user.uid).set(updates, { merge: true });
+    APP.user = { ...APP.user, ...updates };
+    loadUserData();
+    closeProfileModal();
+    showToast('✅ Profil berhasil diperbarui!');
+  } catch (e) {
+    console.error('Gagal update profil:', e);
+    showToast('⚠ Gagal simpan profil, coba lagi');
+  }
 }
 
 function openDokumen() {
-  const saved = JSON.parse(localStorage.getItem('lokalbisa_dokumen') || '{}');
+  const saved = (APP.user && APP.user.dokumen) || {};
   const container = document.getElementById('dok-list');
   container.innerHTML = DOKUMEN_LIST.map(d => `
     <label style="display:flex;align-items:center;gap:.75rem;padding:.75rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:.75rem;margin-bottom:.5rem;cursor:pointer;">
@@ -2322,21 +2356,33 @@ function openDokumen() {
   openProfileModal('modal-dokumen');
 }
 
-function saveDokumen() {
+async function saveDokumen() {
   const saved = {};
   DOKUMEN_LIST.forEach(d => { saved[d.id] = document.getElementById('dok-'+d.id)?.checked || false; });
-  localStorage.setItem('lokalbisa_dokumen', JSON.stringify(saved));
-  const count = Object.values(saved).filter(Boolean).length;
-  closeProfileModal();
-  showToast(`✅ ${count}/${DOKUMEN_LIST.length} dokumen tersimpan`);
+  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
+  try {
+    await usersCol().doc(APP.user.uid).set({ dokumen: saved }, { merge: true });
+    APP.user.dokumen = saved;
+    const count = Object.values(saved).filter(Boolean).length;
+    closeProfileModal();
+    showToast(`✅ ${count}/${DOKUMEN_LIST.length} dokumen tersimpan`);
+  } catch (e) {
+    console.error('Gagal simpan dokumen:', e);
+    showToast('⚠ Gagal simpan, coba lagi');
+  }
 }
 
 function openPremium() { openProfileModal('modal-premium'); }
 
-function claimPremium() {
-  // Simpan status interest ke localStorage untuk tracking
-  const interest = { ts: new Date().toISOString(), phone: APP.user?.phone || '' };
-  localStorage.setItem('lokalbisa_premium_interest', JSON.stringify(interest));
+async function claimPremium() {
+  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
+  // Simpan status interest ke Firestore (koleksi terpisah supaya gampang direkap tim sales)
+  const interest = { ts: firebase.firestore.FieldValue.serverTimestamp(), uid: APP.user.uid, phone: APP.user.phone || '', biz: APP.user.biz || '' };
+  try {
+    await db.collection('premium_interest').doc(APP.user.uid).set(interest);
+  } catch (e) {
+    console.error('Gagal simpan minat premium:', e);
+  }
   closeProfileModal();
   showToast('🚀 Terima kasih! Tim kami akan menghubungi kamu via WhatsApp dalam 1x24 jam.');
   // Buka WhatsApp dengan pesan otomatis
@@ -2345,7 +2391,7 @@ function claimPremium() {
 }
 
 function openNotifikasi() {
-  const saved = JSON.parse(localStorage.getItem('lokalbisa_notif') || '{}');
+  const saved = (APP.user && APP.user.notifPrefs) || {};
   const container = document.getElementById('notif-list');
   container.innerHTML = NOTIF_LIST.map(n => `
     <label style="display:flex;align-items:center;justify-content:space-between;padding:.875rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:.75rem;margin-bottom:.5rem;cursor:pointer;">
@@ -2358,20 +2404,37 @@ function openNotifikasi() {
   openProfileModal('modal-notifikasi');
 }
 
-function saveNotifikasi() {
+async function saveNotifikasi() {
   const saved = {};
   NOTIF_LIST.forEach(n => { saved[n.id] = document.getElementById('notif-'+n.id)?.checked || false; });
-  localStorage.setItem('lokalbisa_notif', JSON.stringify(saved));
-  closeProfileModal();
-  showToast('✅ Pengaturan notifikasi disimpan');
+  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
+  try {
+    await usersCol().doc(APP.user.uid).set({ notifPrefs: saved }, { merge: true });
+    APP.user.notifPrefs = saved;
+    closeProfileModal();
+    showToast('✅ Pengaturan notifikasi disimpan');
+  } catch (e) {
+    console.error('Gagal simpan notifikasi:', e);
+    showToast('⚠ Gagal simpan, coba lagi');
+  }
 }
 
 function openPrivasi() { openProfileModal('modal-privasi'); }
 
-function confirmDeleteData() {
+async function confirmDeleteData() {
   if (!confirm('Yakin ingin menghapus semua data? Tindakan ini tidak dapat dibatalkan.')) return;
-  localStorage.clear();
-  APP.user = null; APP.ersScore = null; APP.chatHistory = [];
+  const uid = APP.user && APP.user.uid;
+  try {
+    if (uid) await usersCol().doc(uid).delete();
+    // Hapus akun login dari Firebase Auth juga. Kalau gagal (butuh login ulang baru-baru ini),
+    // data profil di Firestore tetap sudah terhapus — user akan diarahkan logout.
+    const fbUser = auth.currentUser;
+    if (fbUser) await fbUser.delete().catch(() => auth.signOut());
+  } catch (e) {
+    console.error('Gagal hapus data:', e);
+    showToast('⚠ Sebagian gagal dihapus, coba lagi atau hubungi admin');
+  }
+  APP.user = null; APP.ersScore = null; APP.chatHistory = []; APP.eoi = [];
   closeProfileModal();
   showToast('🗑 Semua data berhasil dihapus');
   setTimeout(() => { showScreen('onboarding'); APP.onboardSlide=0; updateSlide(); }, 1500);
