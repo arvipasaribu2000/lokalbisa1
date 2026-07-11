@@ -2142,21 +2142,72 @@ if(savedEOI) APP.eoi = JSON.parse(savedEOI);
 </div>
 
 <!-- Premium -->
-<div id="modal-premium" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+<div id="modal-premium" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:90vh;overflow-y:auto;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
     <h3 style="font-size:1.1rem;font-weight:700;color:#FFD700;">⭐ Upgrade ke Premium</h3>
-    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;" aria-label="Tutup">✕</button>
   </div>
-  <div style="background:linear-gradient(135deg,rgba(255,215,0,.08),rgba(0,229,255,.08));border:1px solid rgba(255,215,0,.2);border-radius:1rem;padding:1.25rem;margin-bottom:1rem;text-align:center;">
-    <div style="font-size:2rem;margin-bottom:.5rem;">👑</div>
-    <div style="font-size:1.5rem;font-weight:800;color:#FFD700;">Rp 99.000<span style="font-size:.85rem;font-weight:400;color:var(--muted);">/bulan</span></div>
-    <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem;">Batalkan kapan saja</div>
+
+  <!-- Badge terlaris -->
+  <div style="text-align:center;margin-bottom:.75rem;">
+    <span style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;font-size:.7rem;font-weight:800;padding:.3rem .9rem;border-radius:2rem;letter-spacing:1px;">🔥 PALING POPULER</span>
   </div>
-  <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.25rem;">
-    ${['✅ ERS Assessment tidak terbatas','✅ Chat AI Compliance Guide tidak terbatas (100+ pertanyaan/bulan)','✅ Priority Buyer Matching — akses ke 200+ buyer eksklusif','✅ Export Roadmap personal dengan mentor virtual','✅ Notifikasi peluang buyer baru real-time','✅ Badge "UMKM Ekspor Terverifikasi" di profil','✅ Dukungan prioritas via WhatsApp'].map(f=>`<div style="font-size:.85rem;color:rgba(255,255,255,.85);">${f}</div>`).join('')}
+
+  <!-- Harga -->
+  <div style="background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,165,0,.06));border:1.5px solid rgba(255,215,0,.3);border-radius:1.25rem;padding:1.5rem;margin-bottom:1.25rem;text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:.25rem;">👑</div>
+    <div style="font-size:2rem;font-weight:800;color:#FFD700;">Rp 99.000</div>
+    <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem;">/bulan · Batalkan kapan saja</div>
+    <div style="margin-top:.75rem;display:inline-block;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:.5rem;padding:.3rem .75rem;font-size:.72rem;color:#22c55e;font-weight:600;">💚 Hemat Rp 198.000/tahun jika bayar tahunan</div>
   </div>
-  <button class="btn-primary" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;" onclick="showToast('🚀 Fitur pembayaran segera hadir! Hubungi kami via WhatsApp untuk early access.');closeProfileModal();">⭐ Mulai Premium Sekarang</button>
-  <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">Pertanyaan? Chat kami di WhatsApp</div>
+
+  <!-- Perbandingan Free vs Premium -->
+  <div style="margin-bottom:1.25rem;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem;">
+      <div style="background:rgba(255,255,255,.04);border-radius:.75rem;padding:.75rem;text-align:center;font-size:.75rem;font-weight:700;color:var(--muted);">GRATIS</div>
+      <div style="background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,165,0,.06));border:1px solid rgba(255,215,0,.2);border-radius:.75rem;padding:.75rem;text-align:center;font-size:.75rem;font-weight:700;color:#FFD700;">PREMIUM 👑</div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:.5rem;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">📊 ERS <b style="color:#fff;">3x/bulan</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">📊 ERS <b style="color:#FFD700;">Tidak terbatas</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🤖 AI Chat <b style="color:#fff;">10x/bulan</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🤖 AI Chat <b style="color:#FFD700;">Tidak terbatas</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🌐 Buyer <b style="color:#fff;">24 buyer</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🌐 Buyer <b style="color:#FFD700;">200+ eksklusif</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🗺 Roadmap <b style="color:#fff;">Standar</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🗺 Roadmap <b style="color:#FFD700;">+ Mentor Virtual</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🔔 Notifikasi <b style="color:#fff;">—</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🔔 <b style="color:#FFD700;">Buyer baru real-time</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🏅 Badge <b style="color:#fff;">—</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🏅 <b style="color:#FFD700;">"Terverifikasi" di profil</b></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">💬 Support <b style="color:#fff;">Komunitas</b></div>
+        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">💬 Support <b style="color:#FFD700;">WhatsApp Prioritas</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA Buttons -->
+  <button class="btn-primary" onclick="claimPremium()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;font-weight:800;font-size:1rem;">
+    👑 Mulai Premium Sekarang
+  </button>
+  <button onclick="closeProfileModal()" style="width:100%;margin-top:.75rem;padding:.75rem;border-radius:.875rem;border:1px solid rgba(255,255,255,.1);background:none;color:rgba(255,255,255,.5);font-size:.85rem;cursor:pointer;">
+    Lanjut dengan versi Gratis
+  </button>
+  <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">🔒 Pembayaran aman · Tanpa biaya tersembunyi</div>
 </div>
 
 <!-- Notifikasi -->
@@ -2281,6 +2332,17 @@ function saveDokumen() {
 }
 
 function openPremium() { openProfileModal('modal-premium'); }
+
+function claimPremium() {
+  // Simpan status interest ke localStorage untuk tracking
+  const interest = { ts: new Date().toISOString(), phone: APP.user?.phone || '' };
+  localStorage.setItem('lokalbisa_premium_interest', JSON.stringify(interest));
+  closeProfileModal();
+  showToast('🚀 Terima kasih! Tim kami akan menghubungi kamu via WhatsApp dalam 1x24 jam.');
+  // Buka WhatsApp dengan pesan otomatis
+  const msg = encodeURIComponent(`Halo LOKALBISA! Saya tertarik upgrade ke Premium.\nNama usaha: ${APP.user?.biz || '-'}\nNomor WA: ${APP.user?.phone || '-'}`);
+  setTimeout(() => { window.open(`https://wa.me/6283822252759?text=${msg}`, '_blank'); }, 1000);
+}
 
 function openNotifikasi() {
   const saved = JSON.parse(localStorage.getItem('lokalbisa_notif') || '{}');
