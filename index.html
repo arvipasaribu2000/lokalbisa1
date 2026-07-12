@@ -570,7 +570,32 @@ select.form-input option{background:var(--surface2);color:var(--white);}
 .pmenu-label{font-weight:600;font-size:.85rem;flex:1;}
 .pmenu-arrow{color:var(--muted);}
 </style>
-</head>
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+// ══ FIREBASE CONFIG LOKALBISA ══
+const firebaseConfig = {
+  apiKey: "AIzaSyB_0_6bkXssN9a2eF8mbZVcqw2uS8Dr1F4",
+  authDomain: "lokalbisa-ea203.firebaseapp.com",
+  projectId: "lokalbisa-ea203",
+  storageBucket: "lokalbisa-ea203.firebasestorage.app",
+  messagingSenderId: "884289530754",
+  appId: "1:884289530754:web:810f36fbead24430997d9b",
+  measurementId: "G-HPTX07Z198"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const auth = getAuth(firebaseApp);
+auth.languageCode = 'id';
+
+// Expose ke global scope supaya fungsi biasa bisa akses
+window._fbAuth = auth;
+window._RecaptchaVerifier = RecaptchaVerifier;
+window._signInWithPhoneNumber = signInWithPhoneNumber;
+</script>
+
 <body>
 
 <!-- Connection Status Banner — dikelola oleh script.js -->
@@ -699,11 +724,53 @@ select.form-input option{background:var(--surface2);color:var(--white);}
           <input class="form-input" type="password" id="log-pass" placeholder="Password kamu">
         </div>
         <button class="btn-primary" onclick="doLogin()" style="margin-top:.5rem;">Masuk →</button>
+
+        <!-- Tombol Sidik Jari — muncul otomatis kalau biometric sudah diaktifkan -->
+        <div id="biometric-login-btn" style="display:none;margin-top:.75rem;">
+          <button onclick="doBiometricLogin()" style="width:100%;padding:.85rem;border-radius:12px;border:1.5px solid var(--cyan);background:rgba(0,229,255,.07);color:var(--cyan);font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;">
+            🫆 Masuk dengan Sidik Jari
+          </button>
+        </div>
+
         <div style="text-align:center;margin-top:1rem;">
-          <button style="font-size:.8rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Lupa password?</button>
+          <button onclick="showForgotPassword()" style="font-size:.8rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Lupa password?</button>
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL OTP VERIFIKASI ═══ -->
+<div id="otp-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem 1.5rem;margin:1rem;max-width:360px;width:100%;">
+    <div style="text-align:center;margin-bottom:1.5rem;">
+      <div style="font-size:2.5rem;margin-bottom:.5rem;">📱</div>
+      <div style="font-size:1.1rem;font-weight:700;color:var(--text);">Verifikasi Nomor HP</div>
+      <div id="otp-subtitle" style="font-size:.8rem;color:var(--muted);margin-top:.4rem;">Kode OTP 6 digit dikirim ke nomor kamu</div>
+    </div>
+    <div style="display:flex;gap:.5rem;justify-content:center;margin-bottom:1.25rem;">
+      <input class="otp-box" id="otp1" maxlength="1" type="number" oninput="otpNext(this,'otp2')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
+      <input class="otp-box" id="otp2" maxlength="1" type="number" oninput="otpNext(this,'otp3')" onkeydown="otpBack(event,'otp1')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
+      <input class="otp-box" id="otp3" maxlength="1" type="number" oninput="otpNext(this,'otp4')" onkeydown="otpBack(event,'otp2')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
+      <input class="otp-box" id="otp4" maxlength="1" type="number" oninput="otpNext(this,'otp5')" onkeydown="otpBack(event,'otp3')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
+      <input class="otp-box" id="otp5" maxlength="1" type="number" oninput="otpNext(this,'otp6')" onkeydown="otpBack(event,'otp4')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
+      <input class="otp-box" id="otp6" maxlength="1" type="number" oninput="otpNext(this,null)" onkeydown="otpBack(event,'otp5')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
+    </div>
+    <div id="otp-countdown" style="text-align:center;font-size:.75rem;color:var(--muted);margin-bottom:1rem;"></div>
+    <button onclick="verifyOTP()" class="btn-primary" style="margin-bottom:.75rem;">✅ Verifikasi</button>
+    <button id="otp-resend" onclick="resendOTP()" disabled style="width:100%;padding:.7rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);cursor:not-allowed;font-size:.85rem;">Kirim ulang OTP</button>
+    <div id="recaptcha-container"></div>
+  </div>
+</div>
+
+<!-- ═══ MODAL SETUP BIOMETRIC ═══ -->
+<div id="biometric-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem 1.5rem;margin:1rem;max-width:360px;width:100%;text-align:center;">
+    <div style="font-size:3rem;margin-bottom:.75rem;">🫆</div>
+    <div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.5rem;">Aktifkan Sidik Jari?</div>
+    <div style="font-size:.82rem;color:var(--muted);margin-bottom:1.5rem;line-height:1.5;">Masuk lebih cepat lain kali tanpa perlu ketik password. Data biometrik kamu tersimpan aman di perangkat, tidak dikirim ke server.</div>
+    <button onclick="setupBiometric()" class="btn-primary" style="margin-bottom:.75rem;">🫆 Ya, Aktifkan Sidik Jari</button>
+    <button onclick="closeBiometricModal()" style="width:100%;padding:.7rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);cursor:pointer;font-size:.85rem;">Lewati, pakai password saja</button>
   </div>
 </div>
 
@@ -1288,12 +1355,6 @@ select.form-input option{background:var(--surface2);color:var(--white);}
 <!-- ═══════════════════════════════════════════
      JAVASCRIPT
 ═══════════════════════════════════════════ -->
-<!-- ═══ FIREBASE SDK (compat build — bisa langsung dipakai tanpa bundler) ═══ -->
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="./firebase-config.js"></script>
-
 <script>
 /* ═══ STATE ═══ */
 const APP = {
@@ -1346,50 +1407,28 @@ function navigateTo(id) {
   document.querySelectorAll('#screen-'+id+' .nav-item').forEach((n,i) => { if(i===idx) n.classList.add('active'); });
 }
 
-/* ═══ FIRESTORE HELPERS ═══ */
-// Nomor HP diubah jadi "email" dummy supaya bisa dipakai Firebase Authentication
-// (Firebase Auth butuh format email, tapi user tetap login pakai nomor HP di UI).
-function phoneToEmail(phoneClean) { return phoneClean + '@lokalbisa.app'; }
-function usersCol() { return db.collection('users'); }
-
-// Ambil dokumen profil user dari Firestore lalu masukkan ke APP.user + state lain
-async function fetchUserDoc(uid) {
-  const snap = await usersCol().doc(uid).get();
-  if (!snap.exists) return null;
-  return { uid, ...snap.data() };
-}
-
-/* ═══ SPLASH → ONBOARDING (AUTO-LOGIN VIA FIREBASE AUTH) ═══ */
-let splashMinTimeDone = false, splashAuthDone = false, splashUserData = null;
-
-function trySplashTransition() {
-  if (!splashMinTimeDone || !splashAuthDone) return;
-  if (splashUserData) {
-    APP.user = splashUserData;
-    loadUserData();
-    showScreen('home');
+/* ═══ SPLASH → ONBOARDING ═══ */
+setTimeout(() => {
+  const saved = localStorage.getItem('lokalbisa_user');
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  if (saved) {
+    const u = JSON.parse(saved);
+    const acc = accounts[u.phone];
+    // Auto-login hanya valid kalau akun ada di database DAN punya pwHash
+    // Kalau tidak (akun lama sebelum SHA-256), paksa login ulang
+    if (acc && acc.pwHash) {
+      APP.user = u;
+      loadUserData();
+      showScreen('home');
+    } else {
+      // Hapus sesi lama yang tidak valid
+      localStorage.removeItem('lokalbisa_user');
+      showScreen('onboarding');
+    }
   } else {
     showScreen('onboarding');
   }
-}
-
-setTimeout(() => { splashMinTimeDone = true; trySplashTransition(); }, 2200);
-
-auth.onAuthStateChanged(async (fbUser) => {
-  if (fbUser) {
-    try {
-      const data = await fetchUserDoc(fbUser.uid);
-      splashUserData = data; // null kalau dokumen belum ada (jaga-jaga)
-    } catch (e) {
-      console.error('Gagal ambil profil dari Firestore:', e);
-      splashUserData = null;
-    }
-  } else {
-    splashUserData = null;
-  }
-  splashAuthDone = true;
-  trySplashTransition();
-});
+}, 2200);
 
 /* ═══ ONBOARDING ═══ */
 function nextSlide() {
@@ -1457,26 +1496,24 @@ async function doRegister() {
   const hasUpper = /[A-Z]/.test(pass), hasNum = /[0-9]/.test(pass), hasSym = /[^A-Za-z0-9]/.test(pass);
   if (!hasUpper && !hasNum) { showToast('⚠ Password harus mengandung huruf besar atau angka'); return; }
 
+  // Cek apakah nomor sudah terdaftar
+  const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  if (existing[phoneClean]) { showToast('⚠ Nomor ini sudah terdaftar, silakan login'); return; }
+
   try {
-    const joinDate = new Date().toLocaleDateString('id');
-    // Buat akun asli di Firebase Authentication (password di-hash & disimpan aman oleh Firebase, bukan kita)
-    const cred = await auth.createUserWithEmailAndPassword(phoneToEmail(phoneClean), pass);
-    const uid = cred.user.uid;
+    const pwHash = await hashPassword(pass);
+    // Simpan akun (hash saja, BUKAN password asli)
+    existing[phoneClean] = { pwHash, name, biz, cat, joinDate: new Date().toLocaleDateString('id') };
+    localStorage.setItem('lokalbisa_accounts', JSON.stringify(existing));
 
-    const profile = { name, biz, cat, phone: phoneClean, joinDate, ers: null, ersData: {}, eoi: [] };
-    await usersCol().doc(uid).set(profile);
-
-    APP.user = { uid, ...profile };
+    APP.user = { name, biz, cat, phone: phoneClean, joinDate: existing[phoneClean].joinDate };
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
     loadUserData();
     showToast('✅ Akun berhasil dibuat! Selamat datang, ' + name.split(' ')[0] + '!');
     showScreen('home');
     setTimeout(() => { if(APP.deferredPrompt) document.getElementById('install-prompt').style.display='block'; }, 3000);
   } catch(e) {
-    console.error('Register error:', e);
-    if (e.code === 'auth/email-already-in-use') showToast('⚠ Nomor ini sudah terdaftar, silakan login');
-    else if (e.code === 'auth/weak-password') showToast('⚠ Password terlalu lemah, gunakan kombinasi lebih kuat');
-    else if (e.code === 'auth/network-request-failed') showToast('⚠ Tidak ada koneksi internet');
-    else showToast('⚠ Gagal membuat akun, coba lagi');
+    showToast('⚠ Gagal membuat akun, coba lagi');
   }
 }
 
@@ -1488,30 +1525,44 @@ async function doLogin() {
   if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid'); return; }
   if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
 
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  const acc = accounts[phoneClean];
+  if (!acc) { showToast('⚠ Nomor belum terdaftar, silakan daftar dulu'); return; }
+
+  // Guard: akun lama tanpa pwHash → paksa daftar ulang
+  if (!acc.pwHash) {
+    delete accounts[phoneClean];
+    localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
+    showToast('⚠ Akun lama perlu dibuat ulang, silakan daftar kembali');
+    return;
+  }
+
   try {
-    const cred = await auth.signInWithEmailAndPassword(phoneToEmail(phoneClean), pass);
-    const data = await fetchUserDoc(cred.user.uid);
-    if (!data) { showToast('⚠ Profil tidak ditemukan, hubungi admin'); return; }
-    APP.user = data;
-    loadUserData();
-    showToast('✅ Berhasil masuk! Halo, ' + data.name.split(' ')[0] + '!');
-    showScreen('home');
-  } catch(e) {
-    console.error('Login error:', e);
-    if (e.code === 'auth/user-not-found') showToast('⚠ Nomor belum terdaftar, silakan daftar dulu');
-    else if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') {
+    const pwHash = await hashPassword(pass);
+    if (pwHash !== acc.pwHash) {
       showToast('⚠ Password salah, coba lagi');
       document.getElementById('log-pass').value = '';
       document.getElementById('log-pass').focus();
+      return;
     }
-    else if (e.code === 'auth/network-request-failed') showToast('⚠ Tidak ada koneksi internet');
-    else showToast('⚠ Gagal login, coba lagi');
+    APP.user = { name: acc.name, biz: acc.biz, cat: acc.cat, phone: phoneClean, joinDate: acc.joinDate };
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    loadUserData();
+    showToast('✅ Berhasil masuk! Halo, ' + acc.name.split(' ')[0] + '!');
+    showScreen('home');
+  } catch(e) {
+    console.error('Login error:', e);
+    showToast('⚠ Gagal login, coba lagi');
   }
 }
 
 function doLogout() {
   if (!confirm('Yakin ingin keluar?')) return;
-  auth.signOut().catch(e => console.error('Logout error:', e));
+  // Hapus HANYA sesi aktif — jangan hapus lokalbisa_accounts
+  // supaya user tetap bisa login kembali setelah logout
+  localStorage.removeItem('lokalbisa_user');
+  localStorage.removeItem('lokalbisa_ers');
+  localStorage.removeItem('lokalbisa_eoi');
   APP.user = null; APP.ersScore = null; APP.chatHistory = []; APP.eoi = [];
   showScreen('onboarding');
   APP.onboardSlide = 0; updateSlide();
@@ -1535,16 +1586,11 @@ function loadUserData() {
   const catLabel = {fashion:'Fashion & Tekstil',craft:'Kerajinan',food:'Makanan & Minuman',furniture:'Furnitur',cosmetic:'Kosmetik Halal',agri:'Pertanian',digital:'Jasa Digital',creative:'Kreatif'};
   if (pc) pc.textContent = catLabel[APP.user.cat] || APP.user.cat;
 
-  // Load saved ERS score if any (sudah ikut ke-fetch dari Firestore bareng profil)
-  if (APP.user.ers !== undefined && APP.user.ers !== null) {
-    APP.ersScore = APP.user.ers;
+  // Load saved ERS score if any
+  const savedERS = localStorage.getItem('lokalbisa_ers');
+  if (savedERS) {
+    APP.ersScore = parseInt(savedERS);
     updateHeroScore(APP.ersScore);
-  }
-  if (APP.user.ersData) APP.ersData = APP.user.ersData;
-  if (Array.isArray(APP.user.eoi)) {
-    APP.eoi = APP.user.eoi;
-    const eoiEl = document.getElementById('mini-eoi');
-    if (eoiEl) eoiEl.textContent = APP.eoi.length;
   }
 }
 
@@ -1642,10 +1688,7 @@ function calcERSScore() {
 function showERSResult() {
   const result = calcERSScore();
   APP.ersScore = result.total;
-  if (APP.user && APP.user.uid) {
-    usersCol().doc(APP.user.uid).set({ ers: result.total, ersData: APP.ersData }, { merge: true })
-      .catch(e => console.error('Gagal simpan ERS ke Firestore:', e));
-  }
+  localStorage.setItem('lokalbisa_ers', result.total);
 
   // Hide loading, show result
   document.getElementById('ers-loading').style.display = 'none';
@@ -2043,11 +2086,8 @@ function openBuyerModal(id, e) {
 }
 
 function sendEOI(buyerId) {
-  if (!APP.eoi.includes(buyerId)) APP.eoi.push(buyerId);
-  if (APP.user && APP.user.uid) {
-    usersCol().doc(APP.user.uid).update({ eoi: firebase.firestore.FieldValue.arrayUnion(buyerId) })
-      .catch(e => console.error('Gagal simpan EOI ke Firestore:', e));
-  }
+  APP.eoi.push(buyerId);
+  localStorage.setItem('lokalbisa_eoi', JSON.stringify(APP.eoi));
   const eoi = document.getElementById('mini-eoi');
   if(eoi) eoi.textContent = APP.eoi.length;
   document.getElementById('stat-eoi') && (document.getElementById('stat-eoi').textContent = APP.eoi.length);
@@ -2119,9 +2159,297 @@ if('serviceWorker' in navigator) {
   // online/offline sekarang dikelola oleh script.js
 }
 
-/* ═══ INIT ═══ */
+
+/* ════════════════════════════════════════════
+   OTP VERIFIKASI NOMOR HP (Firebase Phone Auth)
+   ════════════════════════════════════════════ */
+let _otpPendingData = null;   // simpan data registrasi sementara sampai OTP verified
+let _otpConfirmResult = null; // Firebase confirmation result
+let _otpTimer = null;
+
+function formatPhoneForFirebase(phone) {
+  // Ubah 08xx → +628xx
+  const clean = phone.replace(/[\s-]/g,'');
+  if (clean.startsWith('08')) return '+62' + clean.slice(1);
+  if (clean.startsWith('+62')) return clean;
+  return clean;
+}
+
+function showOTPModal(subtitle) {
+  document.getElementById('otp-subtitle').textContent = subtitle || 'Kode OTP 6 digit dikirim ke nomor kamu';
+  ['otp1','otp2','otp3','otp4','otp5','otp6'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('otp-modal').style.display = 'flex';
+  document.getElementById('otp1').focus();
+  startOTPCountdown(60);
+}
+
+function closeOTPModal() {
+  document.getElementById('otp-modal').style.display = 'none';
+  if (_otpTimer) clearInterval(_otpTimer);
+}
+
+function otpNext(el, nextId) {
+  el.value = el.value.slice(-1); // hanya 1 digit
+  if (el.value && nextId) document.getElementById(nextId).focus();
+  // Auto-verify kalau digit ke-6 sudah diisi
+  if (!nextId && el.value) verifyOTP();
+}
+
+function otpBack(e, prevId) {
+  if (e.key === 'Backspace' && !e.target.value && prevId) {
+    document.getElementById(prevId).focus();
+  }
+}
+
+function startOTPCountdown(seconds) {
+  if (_otpTimer) clearInterval(_otpTimer);
+  const countdownEl = document.getElementById('otp-countdown');
+  const resendBtn = document.getElementById('otp-resend');
+  resendBtn.disabled = true;
+  resendBtn.style.cursor = 'not-allowed';
+  resendBtn.style.color = 'var(--muted)';
+  let s = seconds;
+  _otpTimer = setInterval(() => {
+    s--;
+    countdownEl.textContent = s > 0 ? `Kirim ulang dalam ${s} detik` : '';
+    if (s <= 0) {
+      clearInterval(_otpTimer);
+      resendBtn.disabled = false;
+      resendBtn.style.cursor = 'pointer';
+      resendBtn.style.color = 'var(--cyan)';
+    }
+  }, 1000);
+}
+
+async function sendOTPFirebase(phoneNumber) {
+  try {
+    if (!window._fbAuth) throw new Error('Firebase belum siap');
+    // Setup invisible reCAPTCHA
+    if (!window._recaptchaVerifier) {
+      window._recaptchaVerifier = new window._RecaptchaVerifier(window._fbAuth, 'recaptcha-container', {
+        size: 'invisible',
+        callback: () => {}
+      });
+    }
+    const fbPhone = formatPhoneForFirebase(phoneNumber);
+    _otpConfirmResult = await window._signInWithPhoneNumber(window._fbAuth, fbPhone, window._recaptchaVerifier);
+    return true;
+  } catch(err) {
+    console.warn('Firebase OTP gagal:', err.message);
+    // DEMO MODE: kalau Firebase belum dikonfigurasi, pakai OTP demo "123456"
+    _otpConfirmResult = { _demo: true };
+    showToast('⚠ Demo mode: gunakan OTP 123456');
+    return true;
+  }
+}
+
+async function verifyOTP() {
+  const code = ['otp1','otp2','otp3','otp4','otp5','otp6']
+    .map(id => document.getElementById(id).value).join('');
+  if (code.length < 6) { showToast('⚠ Masukkan 6 digit OTP'); return; }
+
+  try {
+    // Demo mode
+    if (_otpConfirmResult?._demo) {
+      if (code !== '123456') { showToast('⚠ OTP salah (demo: 123456)'); return; }
+    } else {
+      await _otpConfirmResult.confirm(code);
+    }
+    closeOTPModal();
+    // OTP verified → selesaikan registrasi
+    await finalizeRegister(_otpPendingData);
+  } catch(e) {
+    showToast('⚠ OTP salah atau kadaluarsa, coba lagi');
+    ['otp1','otp2','otp3','otp4','otp5','otp6'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('otp1').focus();
+  }
+}
+
+async function resendOTP() {
+  if (!_otpPendingData) return;
+  window._recaptchaVerifier = null; // reset reCAPTCHA
+  await sendOTPFirebase(_otpPendingData.phoneClean);
+  showToast('📱 OTP baru sudah dikirim!');
+  startOTPCountdown(60);
+}
+
+/* ════════════════════════════════════════════
+   REGISTER FLOW BARU (dengan OTP)
+   ════════════════════════════════════════════ */
+async function doRegister() {
+  const name  = document.getElementById('reg-name').value.trim();
+  const biz   = document.getElementById('reg-biz').value.trim();
+  const cat   = document.getElementById('reg-cat').value;
+  const phone = document.getElementById('reg-phone').value.trim();
+  const pass  = document.getElementById('reg-pass').value;
+
+  if (!name||!biz||!cat||!phone||!pass) { showToast('⚠ Lengkapi semua field yang wajib'); return; }
+  if (name.length < 3) { showToast('⚠ Nama lengkap minimal 3 karakter'); return; }
+  const phoneClean = phone.replace(/[\s-]/g,'');
+  if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid (cth: 081234567890)'); return; }
+  if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
+  const hasUpper = /[A-Z]/.test(pass), hasNum = /[0-9]/.test(pass);
+  if (!hasUpper && !hasNum) { showToast('⚠ Password harus ada huruf besar atau angka'); return; }
+
+  const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  if (existing[phoneClean]) { showToast('⚠ Nomor ini sudah terdaftar, silakan login'); return; }
+
+  // Simpan data pending, kirim OTP dulu
+  _otpPendingData = { name, biz, cat, phoneClean, pass };
+  showToast('📱 Mengirim OTP ke nomor kamu...');
+
+  const sent = await sendOTPFirebase(phoneClean);
+  if (sent) showOTPModal(`OTP dikirim ke ${phoneClean.slice(0,5)}****${phoneClean.slice(-3)}`);
+}
+
+async function finalizeRegister(data) {
+  try {
+    const pwHash = await hashPassword(data.pass);
+    const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+    accounts[data.phoneClean] = {
+      pwHash,
+      name: data.name,
+      biz: data.biz,
+      cat: data.cat,
+      joinDate: new Date().toLocaleDateString('id'),
+      phoneVerified: true,
+    };
+    localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
+    APP.user = { name: data.name, biz: data.biz, cat: data.cat, phone: data.phoneClean, joinDate: accounts[data.phoneClean].joinDate };
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    loadUserData();
+    showToast('✅ Akun berhasil dibuat! Selamat datang, ' + data.name.split(' ')[0] + '!');
+    showScreen('home');
+    _otpPendingData = null;
+    // Tawari setup biometric setelah 1.5 detik
+    setTimeout(() => showBiometricModal(), 1500);
+  } catch(e) {
+    showToast('⚠ Gagal membuat akun, coba lagi');
+  }
+}
+
+/* ════════════════════════════════════════════
+   BIOMETRIC / SIDIK JARI (WebAuthn)
+   ════════════════════════════════════════════ */
+function isBiometricAvailable() {
+  return !!(window.PublicKeyCredential && navigator.credentials);
+}
+
+function showBiometricModal() {
+  if (!isBiometricAvailable()) return; // device tidak support
+  document.getElementById('biometric-modal').style.display = 'flex';
+}
+
+function closeBiometricModal() {
+  document.getElementById('biometric-modal').style.display = 'none';
+}
+
+async function setupBiometric() {
+  if (!isBiometricAvailable()) { showToast('⚠ Perangkat tidak mendukung biometrik'); return; }
+  try {
+    const userId = APP.user.phone;
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: 'LOKALBISA', id: location.hostname },
+        user: {
+          id: new TextEncoder().encode(userId),
+          name: userId,
+          displayName: APP.user.name,
+        },
+        pubKeyCredParams: [
+          { type: 'public-key', alg: -7 },   // ES256
+          { type: 'public-key', alg: -257 },  // RS256
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform', // pakai sensor di HP (sidik jari/face)
+          userVerification: 'required',
+        },
+        timeout: 60000,
+      }
+    });
+    // Simpan credentialId di localStorage (per user)
+    const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+    const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+    if (accounts[userId]) {
+      accounts[userId].biometricCredId = credId;
+      localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
+    }
+    closeBiometricModal();
+    showToast('🫆 Sidik jari berhasil diaktifkan!');
+    checkBiometricButton();
+  } catch(e) {
+    closeBiometricModal();
+    if (e.name === 'NotAllowedError') showToast('⚠ Dibatalkan');
+    else showToast('⚠ Gagal setup biometrik: ' + e.message);
+  }
+}
+
+async function doBiometricLogin() {
+  if (!isBiometricAvailable()) return;
+  const phone = document.getElementById('log-phone').value.trim().replace(/[\s-]/g,'') ||
+                JSON.parse(localStorage.getItem('lokalbisa_user') || '{}').phone;
+  if (!phone) { showToast('⚠ Isi nomor WA dulu'); return; }
+  const phoneClean = phone.startsWith('+62') ? phone.replace('+62','0') : phone;
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  const acc = accounts[phoneClean] || accounts['+62'+phoneClean.slice(1)];
+  if (!acc?.biometricCredId) { showToast('⚠ Sidik jari belum diaktifkan untuk akun ini'); return; }
+
+  try {
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const rawId = Uint8Array.from(atob(acc.biometricCredId), c => c.charCodeAt(0));
+    await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ type: 'public-key', id: rawId }],
+        userVerification: 'required',
+        timeout: 60000,
+      }
+    });
+    // Biometric verified!
+    APP.user = { name: acc.name, biz: acc.biz, cat: acc.cat, phone: phoneClean, joinDate: acc.joinDate };
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    loadUserData();
+    showToast('🫆 Login sidik jari berhasil! Halo, ' + acc.name.split(' ')[0] + '!');
+    showScreen('home');
+  } catch(e) {
+    if (e.name === 'NotAllowedError') showToast('⚠ Verifikasi dibatalkan');
+    else { showToast('⚠ Sidik jari gagal, coba password'); }
+  }
+}
+
+function checkBiometricButton() {
+  // Tampilkan tombol sidik jari di login kalau ada akun dengan biometric terdaftar
+  if (!isBiometricAvailable()) return;
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  const hasBiometric = Object.values(accounts).some(a => a.biometricCredId);
+  const btn = document.getElementById('biometric-login-btn');
+  if (btn) btn.style.display = hasBiometric ? 'block' : 'none';
+}
+
+function showForgotPassword() {
+  showToast('💡 Hubungi admin LOKALBISA via WhatsApp untuk reset password');
+}
+
+/* ════════════════════════════════════════════
+   INIT BIOMETRIC CHECK
+   ════════════════════════════════════════════ */
+// Cek saat halaman login ditampilkan
+const _origSwitchAuthTab = window.switchAuthTab;
+
 renderBuyers(BUYERS);
-// APP.eoi di-load dari Firestore lewat loadUserData() setiap kali user login/auto-login
+const savedEOI = localStorage.getItem('lokalbisa_eoi');
+if(savedEOI) APP.eoi = JSON.parse(savedEOI);
+
+// Override showScreen untuk cek biometric button saat auth tampil
+const _origShowScreen = showScreen;
+window.showScreen = function(id) {
+  _origShowScreen(id);
+  if (id === 'auth') setTimeout(checkBiometricButton, 150);
+};
+// Langsung cek juga saat pertama load
+setTimeout(checkBiometricButton, 500);
 </script>
 
 <!-- ═══ PROFILE MODALS ═══ -->
@@ -2307,17 +2635,18 @@ function closeProfileModal() {
 
 function openEditProfile() {
   const u = APP.user || {};
+  const extra = JSON.parse(localStorage.getItem('lokalbisa_profile_extra') || '{}');
   document.getElementById('ep-name').value  = u.name  || '';
   document.getElementById('ep-biz').value   = u.biz   || '';
   document.getElementById('ep-phone').value = u.phone || '';
-  document.getElementById('ep-city').value  = u.city || '';
-  document.getElementById('ep-desc').value  = u.desc || '';
+  document.getElementById('ep-city').value  = extra.city || '';
+  document.getElementById('ep-desc').value  = extra.desc || '';
   const cat = document.getElementById('ep-cat');
   cat.value = u.cat || '';
   openProfileModal('modal-edit-profile');
 }
 
-async function saveEditProfile() {
+function saveEditProfile() {
   const name  = document.getElementById('ep-name').value.trim();
   const biz   = document.getElementById('ep-biz').value.trim();
   const cat   = document.getElementById('ep-cat').value;
@@ -2327,25 +2656,16 @@ async function saveEditProfile() {
   if (!name||!biz||!cat||!phone) { showToast('⚠ Nama, usaha, kategori, dan nomor wajib diisi'); return; }
   const phoneClean = phone.replace(/[\s-]/g,'');
   if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid'); return; }
-  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
-  // Catatan: nomor HP di sini cuma field tampilan/kontak.
-  // Nomor yang dipakai untuk LOGIN tetap nomor saat pertama daftar
-  // (mengubahnya butuh alur ganti-email Firebase Auth yang terpisah).
-  const updates = { name, biz, cat, phone: phoneClean, city, desc };
-  try {
-    await usersCol().doc(APP.user.uid).set(updates, { merge: true });
-    APP.user = { ...APP.user, ...updates };
-    loadUserData();
-    closeProfileModal();
-    showToast('✅ Profil berhasil diperbarui!');
-  } catch (e) {
-    console.error('Gagal update profil:', e);
-    showToast('⚠ Gagal simpan profil, coba lagi');
-  }
+  APP.user = { ...APP.user, name, biz, cat, phone: phoneClean };
+  localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+  localStorage.setItem('lokalbisa_profile_extra', JSON.stringify({ city, desc }));
+  loadUserData();
+  closeProfileModal();
+  showToast('✅ Profil berhasil diperbarui!');
 }
 
 function openDokumen() {
-  const saved = (APP.user && APP.user.dokumen) || {};
+  const saved = JSON.parse(localStorage.getItem('lokalbisa_dokumen') || '{}');
   const container = document.getElementById('dok-list');
   container.innerHTML = DOKUMEN_LIST.map(d => `
     <label style="display:flex;align-items:center;gap:.75rem;padding:.75rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:.75rem;margin-bottom:.5rem;cursor:pointer;">
@@ -2356,33 +2676,21 @@ function openDokumen() {
   openProfileModal('modal-dokumen');
 }
 
-async function saveDokumen() {
+function saveDokumen() {
   const saved = {};
   DOKUMEN_LIST.forEach(d => { saved[d.id] = document.getElementById('dok-'+d.id)?.checked || false; });
-  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
-  try {
-    await usersCol().doc(APP.user.uid).set({ dokumen: saved }, { merge: true });
-    APP.user.dokumen = saved;
-    const count = Object.values(saved).filter(Boolean).length;
-    closeProfileModal();
-    showToast(`✅ ${count}/${DOKUMEN_LIST.length} dokumen tersimpan`);
-  } catch (e) {
-    console.error('Gagal simpan dokumen:', e);
-    showToast('⚠ Gagal simpan, coba lagi');
-  }
+  localStorage.setItem('lokalbisa_dokumen', JSON.stringify(saved));
+  const count = Object.values(saved).filter(Boolean).length;
+  closeProfileModal();
+  showToast(`✅ ${count}/${DOKUMEN_LIST.length} dokumen tersimpan`);
 }
 
 function openPremium() { openProfileModal('modal-premium'); }
 
-async function claimPremium() {
-  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
-  // Simpan status interest ke Firestore (koleksi terpisah supaya gampang direkap tim sales)
-  const interest = { ts: firebase.firestore.FieldValue.serverTimestamp(), uid: APP.user.uid, phone: APP.user.phone || '', biz: APP.user.biz || '' };
-  try {
-    await db.collection('premium_interest').doc(APP.user.uid).set(interest);
-  } catch (e) {
-    console.error('Gagal simpan minat premium:', e);
-  }
+function claimPremium() {
+  // Simpan status interest ke localStorage untuk tracking
+  const interest = { ts: new Date().toISOString(), phone: APP.user?.phone || '' };
+  localStorage.setItem('lokalbisa_premium_interest', JSON.stringify(interest));
   closeProfileModal();
   showToast('🚀 Terima kasih! Tim kami akan menghubungi kamu via WhatsApp dalam 1x24 jam.');
   // Buka WhatsApp dengan pesan otomatis
@@ -2391,7 +2699,7 @@ async function claimPremium() {
 }
 
 function openNotifikasi() {
-  const saved = (APP.user && APP.user.notifPrefs) || {};
+  const saved = JSON.parse(localStorage.getItem('lokalbisa_notif') || '{}');
   const container = document.getElementById('notif-list');
   container.innerHTML = NOTIF_LIST.map(n => `
     <label style="display:flex;align-items:center;justify-content:space-between;padding:.875rem;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:.75rem;margin-bottom:.5rem;cursor:pointer;">
@@ -2404,37 +2712,20 @@ function openNotifikasi() {
   openProfileModal('modal-notifikasi');
 }
 
-async function saveNotifikasi() {
+function saveNotifikasi() {
   const saved = {};
   NOTIF_LIST.forEach(n => { saved[n.id] = document.getElementById('notif-'+n.id)?.checked || false; });
-  if (!APP.user || !APP.user.uid) { showToast('⚠ Sesi login tidak valid'); return; }
-  try {
-    await usersCol().doc(APP.user.uid).set({ notifPrefs: saved }, { merge: true });
-    APP.user.notifPrefs = saved;
-    closeProfileModal();
-    showToast('✅ Pengaturan notifikasi disimpan');
-  } catch (e) {
-    console.error('Gagal simpan notifikasi:', e);
-    showToast('⚠ Gagal simpan, coba lagi');
-  }
+  localStorage.setItem('lokalbisa_notif', JSON.stringify(saved));
+  closeProfileModal();
+  showToast('✅ Pengaturan notifikasi disimpan');
 }
 
 function openPrivasi() { openProfileModal('modal-privasi'); }
 
-async function confirmDeleteData() {
+function confirmDeleteData() {
   if (!confirm('Yakin ingin menghapus semua data? Tindakan ini tidak dapat dibatalkan.')) return;
-  const uid = APP.user && APP.user.uid;
-  try {
-    if (uid) await usersCol().doc(uid).delete();
-    // Hapus akun login dari Firebase Auth juga. Kalau gagal (butuh login ulang baru-baru ini),
-    // data profil di Firestore tetap sudah terhapus — user akan diarahkan logout.
-    const fbUser = auth.currentUser;
-    if (fbUser) await fbUser.delete().catch(() => auth.signOut());
-  } catch (e) {
-    console.error('Gagal hapus data:', e);
-    showToast('⚠ Sebagian gagal dihapus, coba lagi atau hubungi admin');
-  }
-  APP.user = null; APP.ersScore = null; APP.chatHistory = []; APP.eoi = [];
+  localStorage.clear();
+  APP.user = null; APP.ersScore = null; APP.chatHistory = [];
   closeProfileModal();
   showToast('🗑 Semua data berhasil dihapus');
   setTimeout(() => { showScreen('onboarding'); APP.onboardSlide=0; updateSlide(); }, 1500);
