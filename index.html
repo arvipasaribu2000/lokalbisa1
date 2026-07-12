@@ -1868,29 +1868,79 @@ function sendMessage() {
   });
 }
 
-/* ═══ COMPLIANCE BACKEND ═══ */
-const LOKALBISA_API_URL = 'https://YOUR-BACKEND-URL.run.app/api/compliance';
+/* ═══ COMPLIANCE AI — GEMINI API (direct, no backend needed) ═══
+   Ganti GEMINI_API_KEY dengan API key kamu dari https://aistudio.google.com/apikey
+   API key Gemini GRATIS untuk penggunaan standar (60 req/menit).
+   Fallback ke rule-based lokal kalau API gagal / offline. */
+const GEMINI_API_KEY = 'YOUR-GEMINI-API-KEY';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+const COMPLIANCE_SYSTEM = `Kamu adalah AI Compliance Guide dari LOKALBISA, asisten regulasi ekspor untuk UMKM Indonesia.
+Tugasmu: menjawab pertanyaan tentang dokumen ekspor, sertifikasi, bea cukai, standar labeling, dan prosedur pengiriman ke negara tujuan ekspor, dari sudut pandang eksportir Indonesia.
+
+Aturan:
+- Jawab dalam Bahasa Indonesia yang jelas dan ramah untuk pelaku UMKM.
+- Gunakan format HTML sederhana: <b> untuk bold, <br> untuk baris baru.
+- Berikan info spesifik untuk negara yang disebutkan (dokumen wajib, sertifikasi, regulasi badan pengawas).
+- Kalau tidak yakin 100% akurat, katakan jujur dan sarankan cek ke Kemendag, KBRI, atau badan sertifikasi resmi.
+- Jawaban 150-250 kata, padat dan actionable.
+- Selalu akhiri dengan 💡 satu tip praktis singkat.`;
 
 async function fetchComplianceAnswer(question, country, history = []) {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    const res = await fetch(LOKALBISA_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question, country, history }),
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (!res.ok) throw new Error('Backend error ' + res.status);
-    const data = await res.json();
-    if (!data.text) throw new Error('Respons backend tidak valid');
-    return { text: data.text, cite: data.cite || 'AI Compliance Guide LOKALBISA', confidence: data.confidence || 87 };
-  } catch (err) {
-    console.warn('Compliance backend tidak terjangkau, pakai fallback lokal:', err.message);
-    const local = generateComplianceReply(question, country);
-    return { ...local, cite: (local.cite || '') + ' · ⚠ Mode offline' };
+  // Coba Gemini API dulu
+  if (GEMINI_API_KEY !== 'YOUR-GEMINI-API-KEY') {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+
+      // Bangun conversation history untuk Gemini
+      const contents = [];
+      const recent = history.slice(-8);
+      for (let i = 0; i < recent.length; i++) {
+        contents.push({
+          role: recent[i].role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: recent[i].content }]
+        });
+      }
+      contents.push({
+        role: 'user',
+        parts: [{ text: `Negara tujuan ekspor: ${country || 'belum dipilih'}\nPertanyaan: ${question}` }]
+      });
+
+      const res = await fetch(GEMINI_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: COMPLIANCE_SYSTEM }] },
+          contents,
+          generationConfig: { maxOutputTokens: 600, temperature: 0.4 }
+        }),
+        signal: controller.signal
+      });
+      clearTimeout(timeout);
+
+      if (!res.ok) throw new Error('Gemini error ' + res.status);
+      const data = await res.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!text) throw new Error('Respons Gemini kosong');
+
+      return {
+        text,
+        cite: `AI Compliance Guide LOKALBISA (Gemini) · ${new Date().toLocaleDateString('id-ID')}`,
+        confidence: 88
+      };
+    } catch (err) {
+      console.warn('Gemini API gagal, fallback ke rule-based:', err.message);
+    }
   }
+
+  // Fallback: rule-based lokal (offline / API belum dikonfigurasi)
+  const local = generateComplianceReply(question, country);
+  const isPlaceholder = GEMINI_API_KEY === 'YOUR-GEMINI-API-KEY';
+  return {
+    ...local,
+    cite: (local.cite || '') + (isPlaceholder ? ' · ⚙ Konfigurasi Gemini API untuk jawaban lebih lengkap' : ' · ⚠ Mode offline')
+  };
 }
 
 function appendMsg(type, text, cite, confidence) {
