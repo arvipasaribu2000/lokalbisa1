@@ -1335,9 +1335,6 @@ window._signInWithPhoneNumber = signInWithPhoneNumber;
 <div id="toast"></div>
 
 <!-- Install prompt -->
-<div id="offline-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;text-align:center;padding:.5rem 1rem;font-size:.8rem;font-weight:600;">
-  📵 Mode Offline — Chat AI tidak tersedia, fitur lain tetap berjalan
-</div>
 <div id="install-prompt" style="display:none;position:fixed;bottom:calc(var(--bottom-h) + .8rem);left:1rem;right:1rem;z-index:800;
   background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:1rem;
   box-shadow:0 8px 40px rgba(0,0,0,.5);">
@@ -2129,35 +2126,7 @@ function installApp() {
 }
 window.addEventListener('appinstalled', () => showToast('✅ LOKALBISA sudah terpasang di HP kamu!'));
 
-/* ═══ SERVICE WORKER REGISTER ═══ */
-if('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').then(reg => {
-      console.log('✅ SW registered:', reg.scope);
-      // Deteksi update SW — kasih tahu user ada versi baru
-      reg.addEventListener('updatefound', () => {
-        const newSW = reg.installing;
-        newSW.addEventListener('statechange', () => {
-          if(newSW.state === 'installed' && navigator.serviceWorker.controller) {
-            showToast('🔄 Ada pembaruan LOKALBISA! Tutup & buka ulang untuk update.');
-          }
-        });
-      });
-    }).catch(e => console.warn('SW error:', e));
-  });
-
-  // Deteksi offline/online — tampilkan banner
-  function updateOnlineStatus() {
-    const banner = document.getElementById('offline-banner');
-    if(!banner) return;
-    if(navigator.onLine) {
-      banner.style.display = 'none';
-    } else {
-      banner.style.display = 'block';
-    }
-  }
-  // online/offline sekarang dikelola oleh script.js
-}
+/* SW registration & online/offline detection dikelola oleh script.js */
 
 
 /* ════════════════════════════════════════════
