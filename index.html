@@ -570,32 +570,7 @@ select.form-input option{background:var(--surface2);color:var(--white);}
 .pmenu-label{font-weight:600;font-size:.85rem;flex:1;}
 .pmenu-arrow{color:var(--muted);}
 </style>
-<!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-
-// ══ FIREBASE CONFIG LOKALBISA ══
-const firebaseConfig = {
-  apiKey: "AIzaSyB_0_6bkXssN9a2eF8mbZVcqw2uS8Dr1F4",
-  authDomain: "lokalbisa-ea203.firebaseapp.com",
-  projectId: "lokalbisa-ea203",
-  storageBucket: "lokalbisa-ea203.firebasestorage.app",
-  messagingSenderId: "884289530754",
-  appId: "1:884289530754:web:810f36fbead24430997d9b",
-  measurementId: "G-HPTX07Z198"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const auth = getAuth(firebaseApp);
-auth.languageCode = 'id';
-
-// Expose ke global scope supaya fungsi biasa bisa akses
-window._fbAuth = auth;
-window._RecaptchaVerifier = RecaptchaVerifier;
-window._signInWithPhoneNumber = signInWithPhoneNumber;
-</script>
-
+</head>
 <body>
 
 <!-- Connection Status Banner — dikelola oleh script.js -->
@@ -724,53 +699,11 @@ window._signInWithPhoneNumber = signInWithPhoneNumber;
           <input class="form-input" type="password" id="log-pass" placeholder="Password kamu">
         </div>
         <button class="btn-primary" onclick="doLogin()" style="margin-top:.5rem;">Masuk →</button>
-
-        <!-- Tombol Sidik Jari — muncul otomatis kalau biometric sudah diaktifkan -->
-        <div id="biometric-login-btn" style="display:none;margin-top:.75rem;">
-          <button onclick="doBiometricLogin()" style="width:100%;padding:.85rem;border-radius:12px;border:1.5px solid var(--cyan);background:rgba(0,229,255,.07);color:var(--cyan);font-size:1rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.5rem;">
-            🫆 Masuk dengan Sidik Jari
-          </button>
-        </div>
-
         <div style="text-align:center;margin-top:1rem;">
-          <button onclick="showForgotPassword()" style="font-size:.8rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Lupa password?</button>
+          <button onclick="forgotPassword()" style="font-size:.8rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Lupa password?</button>
         </div>
       </div>
     </div>
-  </div>
-</div>
-
-<!-- ═══ MODAL OTP VERIFIKASI ═══ -->
-<div id="otp-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem 1.5rem;margin:1rem;max-width:360px;width:100%;">
-    <div style="text-align:center;margin-bottom:1.5rem;">
-      <div style="font-size:2.5rem;margin-bottom:.5rem;">📱</div>
-      <div style="font-size:1.1rem;font-weight:700;color:var(--text);">Verifikasi Nomor HP</div>
-      <div id="otp-subtitle" style="font-size:.8rem;color:var(--muted);margin-top:.4rem;">Kode OTP 6 digit dikirim ke nomor kamu</div>
-    </div>
-    <div style="display:flex;gap:.5rem;justify-content:center;margin-bottom:1.25rem;">
-      <input class="otp-box" id="otp1" maxlength="1" type="number" oninput="otpNext(this,'otp2')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
-      <input class="otp-box" id="otp2" maxlength="1" type="number" oninput="otpNext(this,'otp3')" onkeydown="otpBack(event,'otp1')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
-      <input class="otp-box" id="otp3" maxlength="1" type="number" oninput="otpNext(this,'otp4')" onkeydown="otpBack(event,'otp2')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
-      <input class="otp-box" id="otp4" maxlength="1" type="number" oninput="otpNext(this,'otp5')" onkeydown="otpBack(event,'otp3')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
-      <input class="otp-box" id="otp5" maxlength="1" type="number" oninput="otpNext(this,'otp6')" onkeydown="otpBack(event,'otp4')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
-      <input class="otp-box" id="otp6" maxlength="1" type="number" oninput="otpNext(this,null)" onkeydown="otpBack(event,'otp5')" style="width:44px;height:52px;text-align:center;font-size:1.4rem;font-weight:700;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:var(--text);">
-    </div>
-    <div id="otp-countdown" style="text-align:center;font-size:.75rem;color:var(--muted);margin-bottom:1rem;"></div>
-    <button onclick="verifyOTP()" class="btn-primary" style="margin-bottom:.75rem;">✅ Verifikasi</button>
-    <button id="otp-resend" onclick="resendOTP()" disabled style="width:100%;padding:.7rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);cursor:not-allowed;font-size:.85rem;">Kirim ulang OTP</button>
-    <div id="recaptcha-container"></div>
-  </div>
-</div>
-
-<!-- ═══ MODAL SETUP BIOMETRIC ═══ -->
-<div id="biometric-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2rem 1.5rem;margin:1rem;max-width:360px;width:100%;text-align:center;">
-    <div style="font-size:3rem;margin-bottom:.75rem;">🫆</div>
-    <div style="font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:.5rem;">Aktifkan Sidik Jari?</div>
-    <div style="font-size:.82rem;color:var(--muted);margin-bottom:1.5rem;line-height:1.5;">Masuk lebih cepat lain kali tanpa perlu ketik password. Data biometrik kamu tersimpan aman di perangkat, tidak dikirim ke server.</div>
-    <button onclick="setupBiometric()" class="btn-primary" style="margin-bottom:.75rem;">🫆 Ya, Aktifkan Sidik Jari</button>
-    <button onclick="closeBiometricModal()" style="width:100%;padding:.7rem;background:none;border:1px solid var(--border);border-radius:10px;color:var(--muted);cursor:pointer;font-size:.85rem;">Lewati, pakai password saja</button>
   </div>
 </div>
 
@@ -870,11 +803,11 @@ window._signInWithPhoneNumber = signInWithPhoneNumber;
     <div style="height:1rem;"></div>
   </div>
   <div class="bottom-nav">
-    <div class="nav-item active" onclick="navigateTo('home')" role="button" aria-label="Beranda — Dashboard utama LOKALBISA"><div class="nav-icon">🏠</div>Beranda</div>
-    <div class="nav-item" onclick="navigateTo('ers')" role="button" aria-label="ERS — Hitung Export Readiness Score"><div class="nav-icon">📊</div>ERS</div>
-    <div class="nav-item" onclick="navigateTo('compliance')" role="button" aria-label="AI Chat — Panduan regulasi ekspor"><div class="nav-icon">🤖</div>AI Chat</div>
-    <div class="nav-item" onclick="navigateTo('matching')" role="button" aria-label="Buyer — Smart Buyer Matching internasional"><div class="nav-icon">🌐</div>Buyer</div>
-    <div class="nav-item" onclick="navigateTo('profile')" role="button" aria-label="Profil — Data dan pengaturan akun UMKM"><div class="nav-icon">👤</div>Profil</div>
+    <div class="nav-item active" onclick="navigateTo('home')" role="button" aria-label="Beranda — Dashboard utama LOKALBISA"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5Z"/></svg></div>Beranda</div>
+    <div class="nav-item" onclick="navigateTo('ers')" role="button" aria-label="ERS — Hitung Export Readiness Score"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></div>ERS</div>
+    <div class="nav-item" onclick="navigateTo('compliance')" role="button" aria-label="AI Chat — Panduan regulasi ekspor"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="4" r="1" fill="currentColor" stroke="none"/><path d="M8 14v1"/><path d="M16 14v1"/></svg></div>AI Chat</div>
+    <div class="nav-item" onclick="navigateTo('matching')" role="button" aria-label="Buyer — Smart Buyer Matching internasional"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>Buyer</div>
+    <div class="nav-item" onclick="navigateTo('profile')" role="button" aria-label="Profil — Data dan pengaturan akun UMKM"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></div>Profil</div>
   </div>
 </div>
 
@@ -1112,11 +1045,11 @@ window._signInWithPhoneNumber = signInWithPhoneNumber;
     </div>
   </div>
   <div class="bottom-nav">
-    <div class="nav-item" onclick="navigateTo('home')"><div class="nav-icon">🏠</div>Beranda</div>
-    <div class="nav-item active" onclick="navigateTo('ers')"><div class="nav-icon">📊</div>ERS</div>
-    <div class="nav-item" onclick="navigateTo('compliance')"><div class="nav-icon">🤖</div>AI Chat</div>
-    <div class="nav-item" onclick="navigateTo('matching')"><div class="nav-icon">🌐</div>Buyer</div>
-    <div class="nav-item" onclick="navigateTo('profile')"><div class="nav-icon">👤</div>Profil</div>
+    <div class="nav-item" onclick="navigateTo('home')" role="button" aria-label="Beranda — Dashboard utama LOKALBISA"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5Z"/></svg></div>Beranda</div>
+    <div class="nav-item active" onclick="navigateTo('ers')" role="button" aria-label="ERS — Hitung Export Readiness Score"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></div>ERS</div>
+    <div class="nav-item" onclick="navigateTo('compliance')" role="button" aria-label="AI Chat — Panduan regulasi ekspor"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="4" r="1" fill="currentColor" stroke="none"/><path d="M8 14v1"/><path d="M16 14v1"/></svg></div>AI Chat</div>
+    <div class="nav-item" onclick="navigateTo('matching')" role="button" aria-label="Buyer — Smart Buyer Matching internasional"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>Buyer</div>
+    <div class="nav-item" onclick="navigateTo('profile')" role="button" aria-label="Profil — Data dan pengaturan akun UMKM"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></div>Profil</div>
   </div>
 </div>
 
@@ -1223,11 +1156,11 @@ window._signInWithPhoneNumber = signInWithPhoneNumber;
     <div style="height:1rem;"></div>
   </div>
   <div class="bottom-nav">
-    <div class="nav-item" onclick="navigateTo('home')"><div class="nav-icon">🏠</div>Beranda</div>
-    <div class="nav-item" onclick="navigateTo('ers')"><div class="nav-icon">📊</div>ERS</div>
-    <div class="nav-item" onclick="navigateTo('compliance')"><div class="nav-icon">🤖</div>AI Chat</div>
-    <div class="nav-item active" onclick="navigateTo('matching')"><div class="nav-icon">🌐</div>Buyer</div>
-    <div class="nav-item" onclick="navigateTo('profile')"><div class="nav-icon">👤</div>Profil</div>
+    <div class="nav-item" onclick="navigateTo('home')" role="button" aria-label="Beranda — Dashboard utama LOKALBISA"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5Z"/></svg></div>Beranda</div>
+    <div class="nav-item" onclick="navigateTo('ers')" role="button" aria-label="ERS — Hitung Export Readiness Score"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></div>ERS</div>
+    <div class="nav-item" onclick="navigateTo('compliance')" role="button" aria-label="AI Chat — Panduan regulasi ekspor"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="4" r="1" fill="currentColor" stroke="none"/><path d="M8 14v1"/><path d="M16 14v1"/></svg></div>AI Chat</div>
+    <div class="nav-item active" onclick="navigateTo('matching')" role="button" aria-label="Buyer — Smart Buyer Matching internasional"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>Buyer</div>
+    <div class="nav-item" onclick="navigateTo('profile')" role="button" aria-label="Profil — Data dan pengaturan akun UMKM"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></div>Profil</div>
   </div>
 </div>
 
@@ -1305,11 +1238,11 @@ window._signInWithPhoneNumber = signInWithPhoneNumber;
     </div>
   </div>
   <div class="bottom-nav">
-    <div class="nav-item" onclick="navigateTo('home')"><div class="nav-icon">🏠</div>Beranda</div>
-    <div class="nav-item" onclick="navigateTo('ers')"><div class="nav-icon">📊</div>ERS</div>
-    <div class="nav-item" onclick="navigateTo('compliance')"><div class="nav-icon">🤖</div>AI Chat</div>
-    <div class="nav-item" onclick="navigateTo('matching')"><div class="nav-icon">🌐</div>Buyer</div>
-    <div class="nav-item active" onclick="navigateTo('profile')"><div class="nav-icon">👤</div>Profil</div>
+    <div class="nav-item" onclick="navigateTo('home')" role="button" aria-label="Beranda — Dashboard utama LOKALBISA"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5Z"/></svg></div>Beranda</div>
+    <div class="nav-item" onclick="navigateTo('ers')" role="button" aria-label="ERS — Hitung Export Readiness Score"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></div>ERS</div>
+    <div class="nav-item" onclick="navigateTo('compliance')" role="button" aria-label="AI Chat — Panduan regulasi ekspor"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M12 8V4"/><circle cx="8" cy="4" r="1"/><circle cx="12" cy="4" r="1" fill="currentColor" stroke="none"/><path d="M8 14v1"/><path d="M16 14v1"/></svg></div>AI Chat</div>
+    <div class="nav-item" onclick="navigateTo('matching')" role="button" aria-label="Buyer — Smart Buyer Matching internasional"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>Buyer</div>
+    <div class="nav-item active" onclick="navigateTo('profile')" role="button" aria-label="Profil — Data dan pengaturan akun UMKM"><div class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></div>Profil</div>
   </div>
 </div>
 
@@ -1868,79 +1801,36 @@ function sendMessage() {
   });
 }
 
-/* ═══ COMPLIANCE AI — GEMINI API (direct, no backend needed) ═══
-   Ganti GEMINI_API_KEY dengan API key kamu dari https://aistudio.google.com/apikey
-   API key Gemini GRATIS untuk penggunaan standar (60 req/menit).
-   Fallback ke rule-based lokal kalau API gagal / offline. */
-const GEMINI_API_KEY = 'YOUR-GEMINI-API-KEY';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-const COMPLIANCE_SYSTEM = `Kamu adalah AI Compliance Guide dari LOKALBISA, asisten regulasi ekspor untuk UMKM Indonesia.
-Tugasmu: menjawab pertanyaan tentang dokumen ekspor, sertifikasi, bea cukai, standar labeling, dan prosedur pengiriman ke negara tujuan ekspor, dari sudut pandang eksportir Indonesia.
-
-Aturan:
-- Jawab dalam Bahasa Indonesia yang jelas dan ramah untuk pelaku UMKM.
-- Gunakan format HTML sederhana: <b> untuk bold, <br> untuk baris baru.
-- Berikan info spesifik untuk negara yang disebutkan (dokumen wajib, sertifikasi, regulasi badan pengawas).
-- Kalau tidak yakin 100% akurat, katakan jujur dan sarankan cek ke Kemendag, KBRI, atau badan sertifikasi resmi.
-- Jawaban 150-250 kata, padat dan actionable.
-- Selalu akhiri dengan 💡 satu tip praktis singkat.`;
+/* ═══ COMPLIANCE BACKEND ═══ */
+// Isi dengan URL backend Cloud Run kamu setelah deploy, mis:
+// const LOKALBISA_API_URL = 'https://lokalbisa-api-xxxx.run.app/api/compliance';
+const LOKALBISA_API_URL = ''; // kosong = backend belum di-deploy, pakai knowledge base lokal
+const BACKEND_CONFIGURED = !!LOKALBISA_API_URL && !LOKALBISA_API_URL.includes('YOUR-BACKEND-URL');
 
 async function fetchComplianceAnswer(question, country, history = []) {
-  // Coba Gemini API dulu
-  if (GEMINI_API_KEY !== 'AQ.Ab8RN6IscqHxA6P0y6Eqnk5P31JfnuKIPAt7spTg7JJiIsz_fA') {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12000);
-
-      // Bangun conversation history untuk Gemini
-      const contents = [];
-      const recent = history.slice(-8);
-      for (let i = 0; i < recent.length; i++) {
-        contents.push({
-          role: recent[i].role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: recent[i].content }]
-        });
-      }
-      contents.push({
-        role: 'user',
-        parts: [{ text: `Negara tujuan ekspor: ${country || 'belum dipilih'}\nPertanyaan: ${question}` }]
-      });
-
-      const res = await fetch(GEMINI_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: COMPLIANCE_SYSTEM }] },
-          contents,
-          generationConfig: { maxOutputTokens: 600, temperature: 0.4 }
-        }),
-        signal: controller.signal
-      });
-      clearTimeout(timeout);
-
-      if (!res.ok) throw new Error('Gemini error ' + res.status);
-      const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (!text) throw new Error('Respons Gemini kosong');
-
-      return {
-        text,
-        cite: `AI Compliance Guide LOKALBISA (Gemini) · ${new Date().toLocaleDateString('id-ID')}`,
-        confidence: 88
-      };
-    } catch (err) {
-      console.warn('Gemini API gagal, fallback ke rule-based:', err.message);
-    }
+  // Backend belum di-deploy → langsung pakai knowledge base lokal,
+  // tanpa mencoba fetch ke URL placeholder (hemat 10 detik & tidak menampilkan status "offline" yang menyesatkan)
+  if (!BACKEND_CONFIGURED) {
+    return generateComplianceReply(question, country);
   }
-
-  // Fallback: rule-based lokal (offline / API belum dikonfigurasi)
-  const local = generateComplianceReply(question, country);
-  const isPlaceholder = GEMINI_API_KEY === 'YOUR-GEMINI-API-KEY';
-  return {
-    ...local,
-    cite: (local.cite || '') + (isPlaceholder ? ' · ⚙ Konfigurasi Gemini API untuk jawaban lebih lengkap' : ' · ⚠ Mode offline')
-  };
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const res = await fetch(LOKALBISA_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, country, history }),
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) throw new Error('Backend error ' + res.status);
+    const data = await res.json();
+    if (!data.text) throw new Error('Respons backend tidak valid');
+    return { text: data.text, cite: data.cite || 'AI Compliance Guide LOKALBISA', confidence: data.confidence || 87 };
+  } catch (err) {
+    console.warn('Compliance backend tidak terjangkau, pakai knowledge base lokal:', err.message);
+    return generateComplianceReply(question, country);
+  }
 }
 
 function appendMsg(type, text, cite, confidence) {
@@ -2176,299 +2066,14 @@ function installApp() {
 }
 window.addEventListener('appinstalled', () => showToast('✅ LOKALBISA sudah terpasang di HP kamu!'));
 
-/* SW registration & online/offline detection dikelola oleh script.js */
+// Catatan: registrasi Service Worker dan deteksi online/offline
+// sudah ditangani terpusat di script.js (banner #connection-status)
+// — tidak didaftarkan ulang di sini agar tidak duplikat.
 
-
-/* ════════════════════════════════════════════
-   OTP VERIFIKASI NOMOR HP (Firebase Phone Auth)
-   ════════════════════════════════════════════ */
-let _otpPendingData = null;   // simpan data registrasi sementara sampai OTP verified
-let _otpConfirmResult = null; // Firebase confirmation result
-let _otpTimer = null;
-
-function formatPhoneForFirebase(phone) {
-  // Ubah 08xx → +628xx
-  const clean = phone.replace(/[\s-]/g,'');
-  if (clean.startsWith('08')) return '+62' + clean.slice(1);
-  if (clean.startsWith('+62')) return clean;
-  return clean;
-}
-
-function showOTPModal(subtitle) {
-  document.getElementById('otp-subtitle').textContent = subtitle || 'Kode OTP 6 digit dikirim ke nomor kamu';
-  ['otp1','otp2','otp3','otp4','otp5','otp6'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('otp-modal').style.display = 'flex';
-  document.getElementById('otp1').focus();
-  startOTPCountdown(60);
-}
-
-function closeOTPModal() {
-  document.getElementById('otp-modal').style.display = 'none';
-  if (_otpTimer) clearInterval(_otpTimer);
-}
-
-function otpNext(el, nextId) {
-  el.value = el.value.slice(-1); // hanya 1 digit
-  if (el.value && nextId) document.getElementById(nextId).focus();
-  // Auto-verify kalau digit ke-6 sudah diisi
-  if (!nextId && el.value) verifyOTP();
-}
-
-function otpBack(e, prevId) {
-  if (e.key === 'Backspace' && !e.target.value && prevId) {
-    document.getElementById(prevId).focus();
-  }
-}
-
-function startOTPCountdown(seconds) {
-  if (_otpTimer) clearInterval(_otpTimer);
-  const countdownEl = document.getElementById('otp-countdown');
-  const resendBtn = document.getElementById('otp-resend');
-  resendBtn.disabled = true;
-  resendBtn.style.cursor = 'not-allowed';
-  resendBtn.style.color = 'var(--muted)';
-  let s = seconds;
-  _otpTimer = setInterval(() => {
-    s--;
-    countdownEl.textContent = s > 0 ? `Kirim ulang dalam ${s} detik` : '';
-    if (s <= 0) {
-      clearInterval(_otpTimer);
-      resendBtn.disabled = false;
-      resendBtn.style.cursor = 'pointer';
-      resendBtn.style.color = 'var(--cyan)';
-    }
-  }, 1000);
-}
-
-async function sendOTPFirebase(phoneNumber) {
-  try {
-    if (!window._fbAuth) throw new Error('Firebase belum siap');
-    // Setup invisible reCAPTCHA
-    if (!window._recaptchaVerifier) {
-      window._recaptchaVerifier = new window._RecaptchaVerifier(window._fbAuth, 'recaptcha-container', {
-        size: 'invisible',
-        callback: () => {}
-      });
-    }
-    const fbPhone = formatPhoneForFirebase(phoneNumber);
-    _otpConfirmResult = await window._signInWithPhoneNumber(window._fbAuth, fbPhone, window._recaptchaVerifier);
-    return true;
-  } catch(err) {
-    console.warn('Firebase OTP gagal:', err.message);
-    // DEMO MODE: kalau Firebase belum dikonfigurasi, pakai OTP demo "123456"
-    _otpConfirmResult = { _demo: true };
-    showToast('⚠ Demo mode: gunakan OTP 123456');
-    return true;
-  }
-}
-
-async function verifyOTP() {
-  const code = ['otp1','otp2','otp3','otp4','otp5','otp6']
-    .map(id => document.getElementById(id).value).join('');
-  if (code.length < 6) { showToast('⚠ Masukkan 6 digit OTP'); return; }
-
-  try {
-    // Demo mode
-    if (_otpConfirmResult?._demo) {
-      if (code !== '123456') { showToast('⚠ OTP salah (demo: 123456)'); return; }
-    } else {
-      await _otpConfirmResult.confirm(code);
-    }
-    closeOTPModal();
-    // OTP verified → selesaikan registrasi
-    await finalizeRegister(_otpPendingData);
-  } catch(e) {
-    showToast('⚠ OTP salah atau kadaluarsa, coba lagi');
-    ['otp1','otp2','otp3','otp4','otp5','otp6'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('otp1').focus();
-  }
-}
-
-async function resendOTP() {
-  if (!_otpPendingData) return;
-  window._recaptchaVerifier = null; // reset reCAPTCHA
-  await sendOTPFirebase(_otpPendingData.phoneClean);
-  showToast('📱 OTP baru sudah dikirim!');
-  startOTPCountdown(60);
-}
-
-/* ════════════════════════════════════════════
-   REGISTER FLOW BARU (dengan OTP)
-   ════════════════════════════════════════════ */
-async function doRegister() {
-  const name  = document.getElementById('reg-name').value.trim();
-  const biz   = document.getElementById('reg-biz').value.trim();
-  const cat   = document.getElementById('reg-cat').value;
-  const phone = document.getElementById('reg-phone').value.trim();
-  const pass  = document.getElementById('reg-pass').value;
-
-  if (!name||!biz||!cat||!phone||!pass) { showToast('⚠ Lengkapi semua field yang wajib'); return; }
-  if (name.length < 3) { showToast('⚠ Nama lengkap minimal 3 karakter'); return; }
-  const phoneClean = phone.replace(/[\s-]/g,'');
-  if (!/^(08|\+628)[0-9]{8,13}$/.test(phoneClean)) { showToast('⚠ Format nomor WhatsApp tidak valid (cth: 081234567890)'); return; }
-  if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
-  const hasUpper = /[A-Z]/.test(pass), hasNum = /[0-9]/.test(pass);
-  if (!hasUpper && !hasNum) { showToast('⚠ Password harus ada huruf besar atau angka'); return; }
-
-  const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-  if (existing[phoneClean]) { showToast('⚠ Nomor ini sudah terdaftar, silakan login'); return; }
-
-  // Simpan data pending, kirim OTP dulu
-  _otpPendingData = { name, biz, cat, phoneClean, pass };
-  showToast('📱 Mengirim OTP ke nomor kamu...');
-
-  const sent = await sendOTPFirebase(phoneClean);
-  if (sent) showOTPModal(`OTP dikirim ke ${phoneClean.slice(0,5)}****${phoneClean.slice(-3)}`);
-}
-
-async function finalizeRegister(data) {
-  try {
-    const pwHash = await hashPassword(data.pass);
-    const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-    accounts[data.phoneClean] = {
-      pwHash,
-      name: data.name,
-      biz: data.biz,
-      cat: data.cat,
-      joinDate: new Date().toLocaleDateString('id'),
-      phoneVerified: true,
-    };
-    localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
-    APP.user = { name: data.name, biz: data.biz, cat: data.cat, phone: data.phoneClean, joinDate: accounts[data.phoneClean].joinDate };
-    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
-    loadUserData();
-    showToast('✅ Akun berhasil dibuat! Selamat datang, ' + data.name.split(' ')[0] + '!');
-    showScreen('home');
-    _otpPendingData = null;
-    // Tawari setup biometric setelah 1.5 detik
-    setTimeout(() => showBiometricModal(), 1500);
-  } catch(e) {
-    showToast('⚠ Gagal membuat akun, coba lagi');
-  }
-}
-
-/* ════════════════════════════════════════════
-   BIOMETRIC / SIDIK JARI (WebAuthn)
-   ════════════════════════════════════════════ */
-function isBiometricAvailable() {
-  return !!(window.PublicKeyCredential && navigator.credentials);
-}
-
-function showBiometricModal() {
-  if (!isBiometricAvailable()) return; // device tidak support
-  document.getElementById('biometric-modal').style.display = 'flex';
-}
-
-function closeBiometricModal() {
-  document.getElementById('biometric-modal').style.display = 'none';
-}
-
-async function setupBiometric() {
-  if (!isBiometricAvailable()) { showToast('⚠ Perangkat tidak mendukung biometrik'); return; }
-  try {
-    const userId = APP.user.phone;
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const credential = await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp: { name: 'LOKALBISA', id: location.hostname },
-        user: {
-          id: new TextEncoder().encode(userId),
-          name: userId,
-          displayName: APP.user.name,
-        },
-        pubKeyCredParams: [
-          { type: 'public-key', alg: -7 },   // ES256
-          { type: 'public-key', alg: -257 },  // RS256
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: 'platform', // pakai sensor di HP (sidik jari/face)
-          userVerification: 'required',
-        },
-        timeout: 60000,
-      }
-    });
-    // Simpan credentialId di localStorage (per user)
-    const credId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-    const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-    if (accounts[userId]) {
-      accounts[userId].biometricCredId = credId;
-      localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
-    }
-    closeBiometricModal();
-    showToast('🫆 Sidik jari berhasil diaktifkan!');
-    checkBiometricButton();
-  } catch(e) {
-    closeBiometricModal();
-    if (e.name === 'NotAllowedError') showToast('⚠ Dibatalkan');
-    else showToast('⚠ Gagal setup biometrik: ' + e.message);
-  }
-}
-
-async function doBiometricLogin() {
-  if (!isBiometricAvailable()) return;
-  const phone = document.getElementById('log-phone').value.trim().replace(/[\s-]/g,'') ||
-                JSON.parse(localStorage.getItem('lokalbisa_user') || '{}').phone;
-  if (!phone) { showToast('⚠ Isi nomor WA dulu'); return; }
-  const phoneClean = phone.startsWith('+62') ? phone.replace('+62','0') : phone;
-  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-  const acc = accounts[phoneClean] || accounts['+62'+phoneClean.slice(1)];
-  if (!acc?.biometricCredId) { showToast('⚠ Sidik jari belum diaktifkan untuk akun ini'); return; }
-
-  try {
-    const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const rawId = Uint8Array.from(atob(acc.biometricCredId), c => c.charCodeAt(0));
-    await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        allowCredentials: [{ type: 'public-key', id: rawId }],
-        userVerification: 'required',
-        timeout: 60000,
-      }
-    });
-    // Biometric verified!
-    APP.user = { name: acc.name, biz: acc.biz, cat: acc.cat, phone: phoneClean, joinDate: acc.joinDate };
-    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
-    loadUserData();
-    showToast('🫆 Login sidik jari berhasil! Halo, ' + acc.name.split(' ')[0] + '!');
-    showScreen('home');
-  } catch(e) {
-    if (e.name === 'NotAllowedError') showToast('⚠ Verifikasi dibatalkan');
-    else { showToast('⚠ Sidik jari gagal, coba password'); }
-  }
-}
-
-function checkBiometricButton() {
-  // Tampilkan tombol sidik jari di login kalau ada akun dengan biometric terdaftar
-  if (!isBiometricAvailable()) return;
-  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-  const hasBiometric = Object.values(accounts).some(a => a.biometricCredId);
-  const btn = document.getElementById('biometric-login-btn');
-  if (btn) btn.style.display = hasBiometric ? 'block' : 'none';
-}
-
-function showForgotPassword() {
-  showToast('💡 Hubungi admin LOKALBISA via WhatsApp untuk reset password');
-}
-
-/* ════════════════════════════════════════════
-   INIT BIOMETRIC CHECK
-   ════════════════════════════════════════════ */
-// Cek saat halaman login ditampilkan
-const _origSwitchAuthTab = window.switchAuthTab;
-
+/* ═══ INIT ═══ */
 renderBuyers(BUYERS);
 const savedEOI = localStorage.getItem('lokalbisa_eoi');
 if(savedEOI) APP.eoi = JSON.parse(savedEOI);
-
-// Override showScreen untuk cek biometric button saat auth tampil
-const _origShowScreen = showScreen;
-window.showScreen = function(id) {
-  _origShowScreen(id);
-  if (id === 'auth') setTimeout(checkBiometricButton, 150);
-};
-// Langsung cek juga saat pertama load
-setTimeout(checkBiometricButton, 500);
 </script>
 
 <!-- ═══ PROFILE MODALS ═══ -->
@@ -2515,72 +2120,21 @@ setTimeout(checkBiometricButton, 500);
 </div>
 
 <!-- Premium -->
-<div id="modal-premium" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:90vh;overflow-y:auto;">
+<div id="modal-premium" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
     <h3 style="font-size:1.1rem;font-weight:700;color:#FFD700;">⭐ Upgrade ke Premium</h3>
-    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;" aria-label="Tutup">✕</button>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
   </div>
-
-  <!-- Badge terlaris -->
-  <div style="text-align:center;margin-bottom:.75rem;">
-    <span style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;font-size:.7rem;font-weight:800;padding:.3rem .9rem;border-radius:2rem;letter-spacing:1px;">🔥 PALING POPULER</span>
+  <div style="background:linear-gradient(135deg,rgba(255,215,0,.08),rgba(0,229,255,.08));border:1px solid rgba(255,215,0,.2);border-radius:1rem;padding:1.25rem;margin-bottom:1rem;text-align:center;">
+    <div style="font-size:2rem;margin-bottom:.5rem;">👑</div>
+    <div style="font-size:1.5rem;font-weight:800;color:#FFD700;">Rp 99.000<span style="font-size:.85rem;font-weight:400;color:var(--muted);">/bulan</span></div>
+    <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem;">Batalkan kapan saja</div>
   </div>
-
-  <!-- Harga -->
-  <div style="background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,165,0,.06));border:1.5px solid rgba(255,215,0,.3);border-radius:1.25rem;padding:1.5rem;margin-bottom:1.25rem;text-align:center;">
-    <div style="font-size:2.5rem;margin-bottom:.25rem;">👑</div>
-    <div style="font-size:2rem;font-weight:800;color:#FFD700;">Rp 99.000</div>
-    <div style="font-size:.8rem;color:var(--muted);margin-top:.2rem;">/bulan · Batalkan kapan saja</div>
-    <div style="margin-top:.75rem;display:inline-block;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:.5rem;padding:.3rem .75rem;font-size:.72rem;color:#22c55e;font-weight:600;">💚 Hemat Rp 198.000/tahun jika bayar tahunan</div>
+  <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.25rem;">
+    ${['✅ ERS Assessment tidak terbatas','✅ Chat AI Compliance Guide tidak terbatas (100+ pertanyaan/bulan)','✅ Priority Buyer Matching — akses ke 200+ buyer eksklusif','✅ Export Roadmap personal dengan mentor virtual','✅ Notifikasi peluang buyer baru real-time','✅ Badge "UMKM Ekspor Terverifikasi" di profil','✅ Dukungan prioritas via WhatsApp'].map(f=>`<div style="font-size:.85rem;color:rgba(255,255,255,.85);">${f}</div>`).join('')}
   </div>
-
-  <!-- Perbandingan Free vs Premium -->
-  <div style="margin-bottom:1.25rem;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem;">
-      <div style="background:rgba(255,255,255,.04);border-radius:.75rem;padding:.75rem;text-align:center;font-size:.75rem;font-weight:700;color:var(--muted);">GRATIS</div>
-      <div style="background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,165,0,.06));border:1px solid rgba(255,215,0,.2);border-radius:.75rem;padding:.75rem;text-align:center;font-size:.75rem;font-weight:700;color:#FFD700;">PREMIUM 👑</div>
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:.5rem;">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">📊 ERS <b style="color:#fff;">3x/bulan</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">📊 ERS <b style="color:#FFD700;">Tidak terbatas</b></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🤖 AI Chat <b style="color:#fff;">10x/bulan</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🤖 AI Chat <b style="color:#FFD700;">Tidak terbatas</b></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🌐 Buyer <b style="color:#fff;">24 buyer</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🌐 Buyer <b style="color:#FFD700;">200+ eksklusif</b></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🗺 Roadmap <b style="color:#fff;">Standar</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🗺 Roadmap <b style="color:#FFD700;">+ Mentor Virtual</b></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🔔 Notifikasi <b style="color:#fff;">—</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🔔 <b style="color:#FFD700;">Buyer baru real-time</b></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">🏅 Badge <b style="color:#fff;">—</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">🏅 <b style="color:#FFD700;">"Terverifikasi" di profil</b></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-        <div style="background:rgba(255,255,255,.03);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.6);">💬 Support <b style="color:#fff;">Komunitas</b></div>
-        <div style="background:rgba(255,215,0,.06);border-radius:.625rem;padding:.625rem;font-size:.75rem;color:rgba(255,255,255,.9);">💬 Support <b style="color:#FFD700;">WhatsApp Prioritas</b></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- CTA Buttons -->
-  <button class="btn-primary" onclick="claimPremium()" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;font-weight:800;font-size:1rem;">
-    👑 Mulai Premium Sekarang
-  </button>
-  <button onclick="closeProfileModal()" style="width:100%;margin-top:.75rem;padding:.75rem;border-radius:.875rem;border:1px solid rgba(255,255,255,.1);background:none;color:rgba(255,255,255,.5);font-size:.85rem;cursor:pointer;">
-    Lanjut dengan versi Gratis
-  </button>
-  <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">🔒 Pembayaran aman · Tanpa biaya tersembunyi</div>
+  <button class="btn-primary" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;" onclick="showToast('🚀 Fitur pembayaran segera hadir! Hubungi kami via WhatsApp untuk early access.');closeProfileModal();">⭐ Mulai Premium Sekarang</button>
+  <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">Pertanyaan? Chat kami di WhatsApp</div>
 </div>
 
 <!-- Notifikasi -->
@@ -2616,6 +2170,70 @@ setTimeout(checkBiometricButton, 500);
   <button onclick="confirmDeleteData()" style="width:100%;margin-top:1.25rem;padding:.875rem;border-radius:.875rem;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.08);color:#ff5252;font-weight:600;cursor:pointer;font-size:.9rem;">🗑 Hapus Semua Data Saya</button>
   <button class="btn-primary" onclick="closeProfileModal()" style="margin-top:.75rem;">Tutup</button>
 </div>
+
+<!-- Lupa Password -->
+<div id="modal-forgot" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">🔑 Lupa Password</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div id="forgot-step-verify">
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;">Masukkan nomor WhatsApp dan nama lengkap yang kamu daftarkan untuk verifikasi identitas.</div>
+    <div class="form-group"><label class="form-label">Nomor WhatsApp Terdaftar</label>
+      <input class="form-input" type="tel" id="fg-phone" placeholder="08xxxxxxxxxx"></div>
+    <div class="form-group"><label class="form-label">Nama Lengkap Terdaftar</label>
+      <input class="form-input" id="fg-name" placeholder="Sesuai saat pendaftaran"></div>
+    <button class="btn-primary" onclick="verifyForgotIdentity()" style="margin-top:.5rem;">Verifikasi →</button>
+  </div>
+  <div id="forgot-step-reset" style="display:none;">
+    <div style="font-size:.8rem;color:var(--green);margin-bottom:1rem;">✓ Identitas terverifikasi. Buat password baru.</div>
+    <div class="form-group"><label class="form-label">Password Baru</label>
+      <input class="form-input" type="password" id="fg-newpass" placeholder="Minimal 8 karakter" oninput="checkPassStrength(this.value)"></div>
+    <button class="btn-primary" onclick="submitNewPassword()" style="margin-top:.5rem;">💾 Simpan Password Baru</button>
+  </div>
+</div>
+
+<script>
+/* ═══ FORGOT PASSWORD (verifikasi lokal: nomor WA + nama) ═══ */
+let forgotPhoneClean = null;
+function forgotPassword() {
+  document.getElementById('fg-phone').value = '';
+  document.getElementById('fg-name').value = '';
+  document.getElementById('fg-newpass').value = '';
+  document.getElementById('forgot-step-verify').style.display = '';
+  document.getElementById('forgot-step-reset').style.display = 'none';
+  document.getElementById('modal-overlay').style.display = 'block';
+  document.getElementById('modal-forgot').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+function verifyForgotIdentity() {
+  const phone = document.getElementById('fg-phone').value.trim().replace(/[\s-]/g,'');
+  const name = document.getElementById('fg-name').value.trim().toLowerCase();
+  if (!phone || !name) { showToast('⚠ Lengkapi nomor WhatsApp dan nama'); return; }
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  const acc = accounts[phone];
+  if (!acc || acc.name.trim().toLowerCase() !== name) {
+    showToast('⚠ Nomor WhatsApp dan nama tidak cocok dengan data terdaftar');
+    return;
+  }
+  forgotPhoneClean = phone;
+  document.getElementById('forgot-step-verify').style.display = 'none';
+  document.getElementById('forgot-step-reset').style.display = '';
+}
+async function submitNewPassword() {
+  const pass = document.getElementById('fg-newpass').value;
+  if (pass.length < 8) { showToast('⚠ Password minimal 8 karakter'); return; }
+  const hasUpper = /[A-Z]/.test(pass), hasNum = /[0-9]/.test(pass);
+  if (!hasUpper && !hasNum) { showToast('⚠ Password harus mengandung huruf besar atau angka'); return; }
+  const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
+  if (!forgotPhoneClean || !accounts[forgotPhoneClean]) { showToast('⚠ Sesi verifikasi berakhir, ulangi proses'); return; }
+  accounts[forgotPhoneClean].pwHash = await hashPassword(pass);
+  localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
+  forgotPhoneClean = null;
+  closeProfileModal();
+  showToast('✅ Password berhasil diperbarui! Silakan masuk dengan password baru.');
+}
+</script>
 
 <script>
 /* ═══ PROFILE MODAL FUNCTIONS ═══ */
@@ -2705,17 +2323,6 @@ function saveDokumen() {
 }
 
 function openPremium() { openProfileModal('modal-premium'); }
-
-function claimPremium() {
-  // Simpan status interest ke localStorage untuk tracking
-  const interest = { ts: new Date().toISOString(), phone: APP.user?.phone || '' };
-  localStorage.setItem('lokalbisa_premium_interest', JSON.stringify(interest));
-  closeProfileModal();
-  showToast('🚀 Terima kasih! Tim kami akan menghubungi kamu via WhatsApp dalam 1x24 jam.');
-  // Buka WhatsApp dengan pesan otomatis
-  const msg = encodeURIComponent(`Halo LOKALBISA! Saya tertarik upgrade ke Premium.\nNama usaha: ${APP.user?.biz || '-'}\nNomor WA: ${APP.user?.phone || '-'}`);
-  setTimeout(() => { window.open(`https://wa.me/6283822252759?text=${msg}`, '_blank'); }, 1000);
-}
 
 function openNotifikasi() {
   const saved = JSON.parse(localStorage.getItem('lokalbisa_notif') || '{}');
