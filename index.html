@@ -699,6 +699,9 @@ select.form-input option{background:var(--surface2);color:var(--white);}
           <input class="form-input" type="password" id="log-pass" placeholder="Password kamu">
         </div>
         <button class="btn-primary" onclick="doLogin()" style="margin-top:.5rem;">Masuk →</button>
+        <button id="biometric-login-btn" onclick="loginWithBiometric()" style="display:none;width:100%;margin-top:.6rem;padding:.8rem;border-radius:.875rem;border:1px solid rgba(0,229,255,.35);background:rgba(0,229,255,.08);color:var(--cyan);font-weight:600;cursor:pointer;font-size:.85rem;">
+          👆 Masuk dengan Sidik Jari
+        </button>
         <div style="text-align:center;margin-top:1rem;">
           <button onclick="forgotPassword()" style="font-size:.8rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Lupa password?</button>
         </div>
@@ -714,8 +717,8 @@ select.form-input option{background:var(--surface2);color:var(--white);}
   <div class="top-nav">
     <div class="logo">LOKALBISA</div>
     <div class="spacer"></div>
-    <div class="notif-btn" onclick="showToast('3 notifikasi baru 🔔')">
-      🔔<div class="notif-dot"></div>
+    <div class="notif-btn" onclick="openInbox()" role="button" aria-label="Buka kotak notifikasi">
+      🔔<div class="notif-dot" style="display:none;"></div>
     </div>
   </div>
   <div class="content">
@@ -1226,6 +1229,9 @@ select.form-input option{background:var(--surface2);color:var(--white);}
       <div class="pmenu-item" onclick="openNotifikasi()">
         <div class="pmenu-icon">🔔</div><div class="pmenu-label">Pengaturan Notifikasi</div><div class="pmenu-arrow">›</div>
       </div>
+      <div class="pmenu-item" onclick="openImpactDashboard()">
+        <div class="pmenu-icon">📈</div><div class="pmenu-label">Dashboard Dampak</div><div class="pmenu-arrow">›</div>
+      </div>
       <div class="pmenu-item" onclick="openPrivasi()">
         <div class="pmenu-icon">🔒</div><div class="pmenu-label">Privasi & Keamanan Data</div><div class="pmenu-arrow">›</div>
       </div>
@@ -1286,6 +1292,12 @@ select.form-input option{background:var(--surface2);color:var(--white);}
      JAVASCRIPT
 ═══════════════════════════════════════════ -->
 <script>
+/* ═══ KONFIGURASI BACKEND (isi setelah deploy Cloud Run) ═══
+   Kosong = semua fitur backend (OTP WA, sync Firestore) otomatis nonaktif
+   dan PWA tetap jalan normal 100% pakai localStorage, seperti sekarang.
+   Contoh setelah diisi: 'https://lokalbisa-backend-abc123-as.a.run.app' */
+const BACKEND_BASE_URL = '';
+
 /* ═══ STATE ═══ */
 const APP = {
   user: null,
@@ -1299,6 +1311,7 @@ const APP = {
   deferredPrompt: null,
   chatHistory: [], // multi-turn conversation history untuk Compliance Guide
 };
+
 
 /* ═══ SPLASH NEURAL CANVAS ═══ */
 (function() {
@@ -1350,6 +1363,7 @@ setTimeout(() => {
       APP.user = u;
       loadUserData();
       showScreen('home');
+      syncPull(u.phone);
     } else {
       // Hapus sesi lama yang tidak valid
       localStorage.removeItem('lokalbisa_user');
@@ -1382,6 +1396,7 @@ function switchAuthTab(tab) {
   document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='register')||(i===1&&tab==='login')));
   document.getElementById('form-register').style.display = tab==='register'?'':'none';
   document.getElementById('form-login').style.display = tab==='login'?'':'none';
+  if (tab === 'login') updateBiometricButtonVisibility();
 }
 
 /* ═══ PASSWORD UTILS ═══ */
@@ -1430,21 +1445,109 @@ async function doRegister() {
   const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
   if (existing[phoneClean]) { showToast('⚠ Nomor ini sudah terdaftar, silakan login'); return; }
 
+  const regData = { name, biz, cat, phoneClean, pass };
+
+  // Backend belum di-deploy → langsung daftar tanpa OTP, seperti sebelumnya (tidak ada perubahan perilaku)
+  if (!BACKEND_BASE_URL) {
+    finishRegistration(regData);
+    return;
+  }
+
+  // Backend aktif → kirim OTP dulu sebelum akun benar-benar dibuat
+  showToast('⏳ Mengirim kode verifikasi ke WhatsApp...');
   try {
-    const pwHash = await hashPassword(pass);
-    // Simpan akun (hash saja, BUKAN password asli)
+    const res = await fetch(BACKEND_BASE_URL + '/api/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phoneClean })
+    });
+    if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Gagal mengirim OTP');
+
+    pendingRegistration = regData;
+    document.getElementById('otp-target-phone').textContent = phoneClean;
+    document.getElementById('otp-code-input').value = '';
+    document.getElementById('modal-overlay').style.display = 'block';
+    document.getElementById('modal-otp').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    showToast('✅ Kode OTP dikirim ke WhatsApp kamu');
+  } catch (err) {
+    // Backend/OTP tidak terjangkau → jangan kunci user, lanjutkan tanpa verifikasi
+    console.warn('OTP send gagal, lanjut tanpa verifikasi WA:', err.message);
+    showToast('⚠ Verifikasi WA sedang tidak tersedia, akun dibuat tanpa verifikasi');
+    finishRegistration(regData);
+  }
+}
+
+function finishRegistration({ name, biz, cat, phoneClean, pass }) {
+  hashPassword(pass).then(pwHash => {
+    const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
     existing[phoneClean] = { pwHash, name, biz, cat, joinDate: new Date().toLocaleDateString('id') };
     localStorage.setItem('lokalbisa_accounts', JSON.stringify(existing));
 
     APP.user = { name, biz, cat, phone: phoneClean, joinDate: existing[phoneClean].joinDate };
     localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
     loadUserData();
+    addNotification('🎉', 'Selamat datang di LOKALBISA!', 'Akun kamu berhasil dibuat. Yuk mulai dari ERS Assessment untuk cek kesiapan ekspor.');
     showToast('✅ Akun berhasil dibuat! Selamat datang, ' + name.split(' ')[0] + '!');
     showScreen('home');
     setTimeout(() => { if(APP.deferredPrompt) document.getElementById('install-prompt').style.display='block'; }, 3000);
-  } catch(e) {
-    showToast('⚠ Gagal membuat akun, coba lagi');
+    syncPush();
+    setTimeout(() => promptEnrollBiometric(phoneClean), 1800);
+  }).catch(() => showToast('⚠ Gagal membuat akun, coba lagi'));
+}
+
+let pendingRegistration = null;
+async function verifyRegistrationOtp() {
+  const code = document.getElementById('otp-code-input').value.trim();
+  if (!pendingRegistration) { showToast('⚠ Sesi pendaftaran berakhir, ulangi dari awal'); closeProfileModal(); return; }
+  if (!/^[0-9]{6}$/.test(code)) { showToast('⚠ Kode OTP harus 6 digit'); return; }
+
+  try {
+    const res = await fetch(BACKEND_BASE_URL + '/api/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: pendingRegistration.phoneClean, code })
+    });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok || !data.verified) {
+      showToast('⚠ ' + (data.error || 'Kode salah, coba lagi'));
+      return;
+    }
+    closeProfileModal();
+    const reg = pendingRegistration;
+    pendingRegistration = null;
+    finishRegistration(reg);
+  } catch (err) {
+    showToast('⚠ Gagal verifikasi, cek koneksi internet kamu');
   }
+}
+
+async function resendRegistrationOtp() {
+  if (!pendingRegistration) return;
+  try {
+    showToast('⏳ Mengirim ulang kode...');
+    const res = await fetch(BACKEND_BASE_URL + '/api/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: pendingRegistration.phoneClean })
+    });
+    if (!res.ok) throw new Error();
+    showToast('✅ Kode baru dikirim ke WhatsApp');
+  } catch {
+    showToast('⚠ Gagal kirim ulang, coba lagi sebentar');
+  }
+}
+
+function skipOtpVerification() {
+  // Jaring pengaman: kalau user macet di layar OTP (misal WA telat masuk),
+  // tetap bisa lanjut daftar tanpa terkunci — konsisten dengan filosofi
+  // graceful-degradation di seluruh app ini.
+  if (!pendingRegistration) { closeProfileModal(); return; }
+  closeProfileModal();
+  const reg = pendingRegistration;
+  pendingRegistration = null;
+  showToast('⚠ Melanjutkan tanpa verifikasi WA');
+  finishRegistration(reg);
 }
 
 async function doLogin() {
@@ -1480,6 +1583,8 @@ async function doLogin() {
     loadUserData();
     showToast('✅ Berhasil masuk! Halo, ' + acc.name.split(' ')[0] + '!');
     showScreen('home');
+    syncPull(phoneClean);
+    setTimeout(() => promptEnrollBiometric(phoneClean), 1200);
   } catch(e) {
     console.error('Login error:', e);
     showToast('⚠ Gagal login, coba lagi');
@@ -1521,6 +1626,307 @@ function loadUserData() {
   if (savedERS) {
     APP.ersScore = parseInt(savedERS);
     updateHeroScore(APP.ersScore);
+  }
+
+  renderNotifDot();
+}
+
+/* ═══ NOTIFIKASI (kotak masuk nyata, bukan toast statis) ═══ */
+function notifKey() { return 'lokalbisa_inbox_' + (APP.user?.phone || 'guest'); }
+function getInbox() { return JSON.parse(localStorage.getItem(notifKey()) || '[]'); }
+function saveInbox(list) { localStorage.setItem(notifKey(), JSON.stringify(list)); }
+function addNotification(icon, title, body) {
+  const list = getInbox();
+  list.unshift({ id: Date.now(), icon, title, body, time: new Date().toLocaleString('id', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}), read: false });
+  saveInbox(list.slice(0, 30)); // simpan maks 30 terbaru
+  renderNotifDot();
+}
+function renderNotifDot() {
+  const unread = getInbox().filter(n => !n.read).length;
+  document.querySelectorAll('.notif-dot').forEach(d => d.style.display = unread > 0 ? 'block' : 'none');
+}
+function openInbox() {
+  const list = getInbox();
+  const box = document.getElementById('inbox-list');
+  box.innerHTML = list.length ? list.map(n => `
+    <div style="display:flex;gap:.75rem;padding:.85rem;border-radius:.875rem;background:${n.read?'transparent':'rgba(0,229,255,.06)'};border:1px solid ${n.read?'var(--border)':'rgba(0,229,255,.25)'};margin-bottom:.6rem;">
+      <div style="font-size:1.3rem;flex-shrink:0;">${n.icon}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.85rem;font-weight:700;color:#fff;">${n.title}</div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:.2rem;line-height:1.5;">${n.body}</div>
+        <div style="font-size:.65rem;color:var(--muted);margin-top:.4rem;opacity:.7;">${n.time}</div>
+      </div>
+    </div>`).join('') : `<div style="text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:.85rem;">🔕 Belum ada notifikasi.<br>Aktivitas kamu di LOKALBISA (ERS, EOI, dll) akan muncul di sini.</div>`;
+  document.getElementById('modal-overlay').style.display = 'block';
+  document.getElementById('modal-inbox').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  // Tandai semua terbaca setelah dibuka
+  const marked = list.map(n => ({ ...n, read: true }));
+  saveInbox(marked);
+  setTimeout(renderNotifDot, 400);
+}
+
+/* ═══ SYNC KE BACKEND (Firestore, opsional — aman kalau backend belum aktif) ═══
+   Prinsip: localStorage tetap SATU-SATUNYA sumber kebenaran di device ini.
+   - syncPush(): kirim salinan data ke Firestore secara diam-diam (fire-and-forget).
+     Kalau gagal/backend belum di-deploy, tidak ada efek apa pun ke UI — cuma dicatat di console.
+   - syncPull(): dipanggil sekali saat login, HANYA mengisi data yang KOSONG di device ini
+     (misal login pertama kali di HP baru). Tidak akan pernah menimpa data lokal yang sudah ada,
+     supaya tidak ada risiko kehilangan data karena race condition atau backend basi. */
+let syncTimer = null;
+function syncPush() {
+  if (!BACKEND_BASE_URL || !APP.user) return;
+  // Debounce 1.5 detik biar tidak spam network kalau beberapa aksi terjadi beruntun
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(async () => {
+    try {
+      const payload = {
+        phone: APP.user.phone,
+        data: {
+          user: APP.user,
+          ers: localStorage.getItem('lokalbisa_ers') || null,
+          eoi: APP.eoi,
+          profileExtra: JSON.parse(localStorage.getItem('lokalbisa_profile_extra') || 'null'),
+          dokumen: JSON.parse(localStorage.getItem('lokalbisa_dokumen') || 'null'),
+          notifInbox: getInbox(),
+        }
+      };
+      const res = await fetch(BACKEND_BASE_URL + '/api/sync/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) console.warn('Sync ke backend gagal (non-fatal):', res.status);
+    } catch (err) {
+      console.warn('Sync ke backend tidak terjangkau (non-fatal, data lokal tetap aman):', err.message);
+    }
+  }, 1500);
+}
+
+async function syncPull(phone) {
+  if (!BACKEND_BASE_URL) return;
+  try {
+    const res = await fetch(BACKEND_BASE_URL + '/api/sync/user/' + encodeURIComponent(phone));
+    if (!res.ok) return; // 404 = belum pernah sync, atau backend nonaktif — biarkan saja
+    const remote = await res.json();
+
+    // Hanya isi data yang KOSONG di device ini — tidak pernah menimpa data lokal yang sudah ada
+    if (!localStorage.getItem('lokalbisa_ers') && remote.ers) {
+      localStorage.setItem('lokalbisa_ers', remote.ers);
+      APP.ersScore = parseInt(remote.ers);
+    }
+    if ((!APP.eoi || APP.eoi.length === 0) && remote.eoi?.length) {
+      APP.eoi = remote.eoi;
+      localStorage.setItem('lokalbisa_eoi', JSON.stringify(remote.eoi));
+    }
+    if (!localStorage.getItem('lokalbisa_profile_extra') && remote.profileExtra) {
+      localStorage.setItem('lokalbisa_profile_extra', JSON.stringify(remote.profileExtra));
+    }
+    if (!localStorage.getItem('lokalbisa_dokumen') && remote.dokumen) {
+      localStorage.setItem('lokalbisa_dokumen', JSON.stringify(remote.dokumen));
+    }
+    if (getInbox().length === 0 && remote.notifInbox?.length) {
+      saveInbox(remote.notifInbox);
+    }
+    loadUserData();
+    renderNotifDot();
+    console.log('✅ Data dipulihkan dari Firestore (device baru terdeteksi)');
+  } catch (err) {
+    console.warn('Sync pull tidak terjangkau (non-fatal):', err.message);
+  }
+}
+
+/* ═══ LOGIN SIDIK JARI (WebAuthn) ═══
+   Aktif otomatis kalau BACKEND_BASE_URL sudah diisi DAN device punya sensor
+   biometrik (fingerprint/Face ID/Windows Hello). Kalau salah satu tidak terpenuhi,
+   tombol & prompt biometrik disembunyikan — login password tetap jalan normal. */
+function b64urlToBuffer(b64url) {
+  const b64 = b64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(b64url.length + (4 - b64url.length % 4) % 4, '=');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+function bufferToB64url(buf) {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function biometricAvailable() {
+  if (!BACKEND_BASE_URL) return false;
+  if (!window.PublicKeyCredential) return false;
+  try {
+    return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+  } catch { return false; }
+}
+
+async function updateBiometricButtonVisibility() {
+  const btn = document.getElementById('biometric-login-btn');
+  if (!btn) return;
+  const available = await biometricAvailable();
+  btn.style.display = available ? 'block' : 'none';
+}
+
+async function promptEnrollBiometric(phoneClean) {
+  if (!(await biometricAvailable())) return;
+  if (localStorage.getItem('lokalbisa_biometric_' + phoneClean) === '1') return; // sudah aktif
+  if (sessionStorage.getItem('lokalbisa_biometric_skipped')) return; // sudah ditolak sesi ini, jangan spam
+
+  document.getElementById('modal-overlay').style.display = 'block';
+  document.getElementById('modal-biometric-prompt').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  window._pendingBiometricPhone = phoneClean;
+}
+
+function skipBiometricEnroll() {
+  sessionStorage.setItem('lokalbisa_biometric_skipped', '1');
+  closeProfileModal();
+}
+
+async function enrollBiometric() {
+  const phoneClean = window._pendingBiometricPhone;
+  closeProfileModal();
+  if (!phoneClean) return;
+  try {
+    showToast('⏳ Ikuti instruksi sidik jari/Face ID di device kamu...');
+    const optRes = await fetch(BACKEND_BASE_URL + '/api/webauthn/register/options', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phoneClean })
+    });
+    if (!optRes.ok) throw new Error((await optRes.json().catch(()=>({}))).error || 'Gagal memulai pendaftaran');
+    const options = await optRes.json();
+
+    options.challenge = b64urlToBuffer(options.challenge);
+    options.user.id = b64urlToBuffer(options.user.id);
+    if (options.excludeCredentials) {
+      options.excludeCredentials = options.excludeCredentials.map(c => ({ ...c, id: b64urlToBuffer(c.id) }));
+    }
+
+    const credential = await navigator.credentials.create({ publicKey: options });
+    const attestationResponse = {
+      id: credential.id,
+      rawId: bufferToB64url(credential.rawId),
+      type: credential.type,
+      response: {
+        attestationObject: bufferToB64url(credential.response.attestationObject),
+        clientDataJSON: bufferToB64url(credential.response.clientDataJSON),
+        transports: credential.response.getTransports ? credential.response.getTransports() : [],
+      },
+      clientExtensionResults: credential.getClientExtensionResults(),
+    };
+
+    const verifyRes = await fetch(BACKEND_BASE_URL + '/api/webauthn/register/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phoneClean, response: attestationResponse })
+    });
+    const verifyData = await verifyRes.json();
+    if (!verifyRes.ok || !verifyData.verified) throw new Error(verifyData.error || 'Verifikasi gagal');
+
+    localStorage.setItem('lokalbisa_biometric_' + phoneClean, '1');
+    localStorage.setItem('lokalbisa_last_phone', phoneClean);
+    showToast('✅ Login sidik jari aktif! Login berikutnya bisa langsung pakai sidik jari.');
+  } catch (err) {
+    console.warn('Enrollment biometrik dibatalkan/gagal:', err.message);
+    showToast('⚠ Pendaftaran sidik jari dibatalkan atau gagal, tidak apa — kamu tetap bisa login pakai password.');
+  }
+}
+
+async function loginWithBiometric() {
+  const phoneField = document.getElementById('log-phone').value.trim().replace(/[\s-]/g,'');
+  const phoneClean = phoneField || localStorage.getItem('lokalbisa_last_phone') || '';
+  if (!phoneClean) { showToast('⚠ Isi nomor WhatsApp dulu, lalu tap Sidik Jari'); return; }
+
+  try {
+    showToast('⏳ Ikuti instruksi sidik jari/Face ID di device kamu...');
+    const optRes = await fetch(BACKEND_BASE_URL + '/api/webauthn/login/options', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phoneClean })
+    });
+    const options = await optRes.json();
+    if (!optRes.ok) throw new Error(options.error || 'Sidik jari belum terdaftar untuk nomor ini, login pakai password dulu');
+
+    options.challenge = b64urlToBuffer(options.challenge);
+    if (options.allowCredentials) {
+      options.allowCredentials = options.allowCredentials.map(c => ({ ...c, id: b64urlToBuffer(c.id) }));
+    }
+
+    const assertion = await navigator.credentials.get({ publicKey: options });
+    const assertionResponse = {
+      id: assertion.id,
+      rawId: bufferToB64url(assertion.rawId),
+      type: assertion.type,
+      response: {
+        authenticatorData: bufferToB64url(assertion.response.authenticatorData),
+        clientDataJSON: bufferToB64url(assertion.response.clientDataJSON),
+        signature: bufferToB64url(assertion.response.signature),
+        userHandle: assertion.response.userHandle ? bufferToB64url(assertion.response.userHandle) : null,
+      },
+      clientExtensionResults: assertion.getClientExtensionResults(),
+    };
+
+    const verifyRes = await fetch(BACKEND_BASE_URL + '/api/webauthn/login/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: phoneClean, response: assertionResponse })
+    });
+    const data = await verifyRes.json();
+    if (!verifyRes.ok || !data.verified || !data.user) throw new Error(data.error || 'Login sidik jari gagal, coba login pakai password');
+
+    APP.user = data.user;
+    localStorage.setItem('lokalbisa_user', JSON.stringify(APP.user));
+    localStorage.setItem('lokalbisa_last_phone', phoneClean);
+    if (data.ers) localStorage.setItem('lokalbisa_ers', data.ers);
+    loadUserData();
+    showToast('✅ Berhasil masuk dengan sidik jari! Halo, ' + APP.user.name.split(' ')[0] + '!');
+    showScreen('home');
+  } catch (err) {
+    console.warn('Login biometrik gagal:', err.message);
+    showToast('⚠ ' + (err.message || 'Login sidik jari gagal') + ' — silakan pakai password.');
+  }
+}
+
+function badgeClassFor(badge) {
+  const map = { 'Segera':'badge-r', '3 Bulan':'badge-a', '4 Bulan':'badge-a', '6 Bulan':'badge-c', '12 Bulan':'badge-g' };
+  return map[badge] || 'badge-c';
+}
+
+async function tryPersonalizeRoadmapWithAI(dims) {
+  if (!BACKEND_BASE_URL) return; // roadmap statis sudah cukup baik, tidak perlu apa-apa lagi
+  const rmSec = document.getElementById('roadmap-section');
+  const loadingNote = document.createElement('div');
+  loadingNote.id = 'roadmap-ai-loading';
+  loadingNote.style.cssText = 'font-size:.72rem;color:var(--cyan);margin-top:.5rem;opacity:.8;';
+  loadingNote.textContent = '✨ Menyesuaikan roadmap dengan AI berdasarkan profil kamu...';
+  rmSec.appendChild(loadingNote);
+
+  try {
+    const res = await fetch(BACKEND_BASE_URL + '/api/roadmap', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: APP.user?.cat || null,
+        country: APP.selectedCountry || null,
+        scores: dims,
+        certs: APP.ersData.certs || []
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.steps) throw new Error(data.error || 'Format tidak valid');
+
+    // Render ulang roadmap dengan versi AI, tandai jelas ini dipersonalisasi
+    rmSec.innerHTML = '<div style="font-family:var(--fh);font-size:.85rem;font-weight:700;margin-bottom:.4rem;color:var(--green);">🗺 ROADMAP PERBAIKAN <span style="font-size:.68rem;color:var(--cyan);font-weight:600;">✨ Dipersonalisasi AI</span></div>';
+    if (data.summary) {
+      rmSec.innerHTML += `<div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;padding:.75rem;background:rgba(0,229,255,.06);border-radius:.75rem;border:1px solid rgba(0,229,255,.2);">${data.summary}</div>`;
+    }
+    data.steps.forEach((r, i) => {
+      rmSec.innerHTML += `<div class="roadmap-item"><div class="roadmap-step">${i+1}</div><div><div class="roadmap-title">${r.title}</div><div style="font-family:var(--fm);font-size:.62rem;color:var(--cyan);margin-bottom:.3rem;">${r.period}</div><div class="roadmap-desc">${r.desc}</div><div class="roadmap-badge"><span class="badge ${badgeClassFor(r.badge)}">${r.badge}</span></div></div></div>`;
+    });
+  } catch (err) {
+    // Diam-diam gagal — roadmap statis yang sudah ditampilkan tetap valid & lengkap, tidak perlu ganggu user
+    console.warn('Roadmap AI tidak tersedia, roadmap statis tetap dipakai:', err.message);
+    const note = document.getElementById('roadmap-ai-loading');
+    if (note) note.remove();
   }
 }
 
@@ -1667,6 +2073,7 @@ function showERSResult() {
   roadmapItems.forEach((r,i) => {
     rmSec.innerHTML += `<div class="roadmap-item"><div class="roadmap-step">${i+1}</div><div><div class="roadmap-title">${r.title}</div><div style="font-family:var(--fm);font-size:.62rem;color:var(--cyan);margin-bottom:.3rem;">${r.period}</div><div class="roadmap-desc">${r.desc}</div><div class="roadmap-badge"><span class="badge ${r.cls}">${r.badge}</span></div></div></div>`;
   });
+  tryPersonalizeRoadmapWithAI(result.dims);
 
   // Update dashboard
   updateHeroScore(result.total);
@@ -1675,6 +2082,8 @@ function showERSResult() {
   document.getElementById('step1-bar').style.width = '100%';
 
   showToast('🎉 Skor ERS berhasil dihitung: ' + result.total + '/100');
+  addNotification('📊', 'Skor ERS kamu: ' + result.total + '/100', lvl.label + ' — ' + lvl.desc);
+  syncPush();
 }
 
 function dimNames(k){return{quality:'Kualitas',certification:'Sertifikasi',capacity:'Kapasitas',price:'Harga',logistic:'Logistik',digital:'Digital',track:'Rekam'}[k]||k;}
@@ -1803,9 +2212,9 @@ function sendMessage() {
 
 /* ═══ COMPLIANCE BACKEND ═══ */
 // Isi dengan URL backend Cloud Run kamu setelah deploy, mis:
-// const LOKALBISA_API_URL = 'https://lokalbisa-api-xxxx.run.app/api/compliance';
-const LOKALBISA_API_URL = ''; // kosong = backend belum di-deploy, pakai knowledge base lokal
-const BACKEND_CONFIGURED = !!LOKALBISA_API_URL && !LOKALBISA_API_URL.includes('YOUR-BACKEND-URL');
+// const LOKALBISA_API_URL = 'https://lokalbisa-api-xxxx.run.app/api/compliance'; // (opsional) isi manual kalau backend compliance beda URL dari BACKEND_BASE_URL
+const LOKALBISA_API_URL = BACKEND_BASE_URL ? BACKEND_BASE_URL + '/api/compliance' : '';
+const BACKEND_CONFIGURED = !!LOKALBISA_API_URL;
 
 async function fetchComplianceAnswer(question, country, history = []) {
   // Backend belum di-deploy → langsung pakai knowledge base lokal,
@@ -2034,6 +2443,9 @@ function sendEOI(buyerId) {
   document.getElementById('step3-bar').style.width = '100%';
   closeBuyerModal();
   showToast('✅ EOI berhasil dikirim ke buyer! Mereka akan merespons dalam 3–5 hari kerja.');
+  const buyer = BUYERS.find(b => b.id === buyerId);
+  addNotification('📨', 'EOI terkirim ke ' + (buyer?.name || 'buyer'), (buyer ? buyer.cat + ' · ' : '') + 'Biasanya buyer merespons dalam 3–5 hari kerja.');
+  syncPush();
 }
 
 function closeBuyerModal(e) {
@@ -2137,6 +2549,26 @@ if(savedEOI) APP.eoi = JSON.parse(savedEOI);
   <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">Pertanyaan? Chat kami di WhatsApp</div>
 </div>
 
+<!-- Kotak Notifikasi -->
+<div id="modal-inbox" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">🔔 Notifikasi</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div id="inbox-list"></div>
+</div>
+
+<!-- Dashboard Dampak (investor/juri) -->
+<div id="modal-impact" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">📈 Dashboard Dampak</h3>
+    <button onclick="closeProfileModal()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div id="impact-content">
+    <div style="text-align:center;padding:2rem 1rem;color:var(--muted);font-size:.85rem;">⏳ Memuat data...</div>
+  </div>
+</div>
+
 <!-- Notifikasi -->
 <div id="modal-notifikasi" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
@@ -2169,6 +2601,37 @@ if(savedEOI) APP.eoi = JSON.parse(savedEOI);
   </div>
   <button onclick="confirmDeleteData()" style="width:100%;margin-top:1.25rem;padding:.875rem;border-radius:.875rem;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.08);color:#ff5252;font-weight:600;cursor:pointer;font-size:.9rem;">🗑 Hapus Semua Data Saya</button>
   <button class="btn-primary" onclick="closeProfileModal()" style="margin-top:.75rem;">Tutup</button>
+</div>
+
+<!-- Prompt Aktifkan Sidik Jari -->
+<div id="modal-biometric-prompt" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="text-align:center;padding:.5rem 0 1rem;">
+    <div style="font-size:2.5rem;margin-bottom:.5rem;">👆</div>
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;margin-bottom:.5rem;">Aktifkan Login Sidik Jari?</h3>
+    <div style="font-size:.82rem;color:var(--muted);line-height:1.6;">Login berikutnya cukup pakai sidik jari atau Face ID device kamu, tanpa perlu ketik password lagi.</div>
+  </div>
+  <button class="btn-primary" onclick="enrollBiometric()">👆 Aktifkan Sekarang</button>
+  <button onclick="skipBiometricEnroll()" style="width:100%;margin-top:.6rem;padding:.8rem;background:none;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;">Nanti saja</button>
+</div>
+
+<!-- Verifikasi OTP WhatsApp (registrasi) -->
+<div id="modal-otp" style="display:none;position:fixed;bottom:0;left:0;right:0;z-index:2001;background:#0D1B2A;border-radius:1.5rem 1.5rem 0 0;padding:1.5rem;max-height:85vh;overflow-y:auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+    <h3 style="font-size:1.1rem;font-weight:700;color:#00E5FF;">📱 Verifikasi WhatsApp</h3>
+    <button onclick="skipOtpVerification()" style="background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;">✕</button>
+  </div>
+  <div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;">
+    Kode 6 digit dikirim ke WhatsApp <b id="otp-target-phone" style="color:#fff;"></b>. Masukkan di bawah ini.
+  </div>
+  <div class="form-group">
+    <label class="form-label">Kode OTP</label>
+    <input class="form-input" type="text" inputmode="numeric" maxlength="6" id="otp-code-input" placeholder="123456" style="letter-spacing:.4em;font-size:1.2rem;text-align:center;">
+  </div>
+  <button class="btn-primary" onclick="verifyRegistrationOtp()" style="margin-top:.5rem;">Verifikasi →</button>
+  <div style="display:flex;justify-content:space-between;margin-top:1rem;">
+    <button onclick="resendRegistrationOtp()" style="font-size:.78rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Kirim ulang kode</button>
+    <button onclick="skipOtpVerification()" style="font-size:.78rem;color:var(--muted);background:none;border:none;cursor:pointer;">Lewati verifikasi</button>
+  </div>
 </div>
 
 <!-- Lupa Password -->
@@ -2299,6 +2762,7 @@ function saveEditProfile() {
   loadUserData();
   closeProfileModal();
   showToast('✅ Profil berhasil diperbarui!');
+  syncPush();
 }
 
 function openDokumen() {
@@ -2320,6 +2784,7 @@ function saveDokumen() {
   const count = Object.values(saved).filter(Boolean).length;
   closeProfileModal();
   showToast(`✅ ${count}/${DOKUMEN_LIST.length} dokumen tersimpan`);
+  syncPush();
 }
 
 function openPremium() { openProfileModal('modal-premium'); }
@@ -2347,6 +2812,73 @@ function saveNotifikasi() {
 }
 
 function openPrivasi() { openProfileModal('modal-privasi'); }
+
+/* ═══ DASHBOARD DAMPAK (investor/juri) ═══ */
+async function openImpactDashboard() {
+  openProfileModal('modal-impact');
+  const el = document.getElementById('impact-content');
+
+  if (!BACKEND_BASE_URL) {
+    el.innerHTML = `
+      <div style="text-align:center;padding:1.5rem 1rem;">
+        <div style="font-size:2rem;margin-bottom:.5rem;">📊</div>
+        <div style="font-size:.85rem;color:var(--muted);line-height:1.7;">
+          Dashboard dampak menampilkan statistik <b style="color:#fff;">agregat semua pengguna LOKALBISA</b>
+          (total UMKM terdaftar, rata-rata skor ERS, total EOI terkirim, dll) — datanya diambil dari Firestore.<br><br>
+          Backend belum di-deploy di device ini, jadi datanya belum bisa ditampilkan. Setelah <code>BACKEND_BASE_URL</code>
+          diisi (lihat <code>backend/DEPLOY.md</code>), dashboard ini otomatis terisi data nyata.
+        </div>
+      </div>`;
+    return;
+  }
+
+  try {
+    const res = await fetch(BACKEND_BASE_URL + '/api/stats/impact');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Gagal memuat statistik');
+
+    const statCard = (label, value, color) => `
+      <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:.875rem;padding:1rem;text-align:center;">
+        <div style="font-family:var(--fh);font-size:1.6rem;font-weight:700;color:${color};">${value}</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:.3rem;">${label}</div>
+      </div>`;
+
+    let html = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1.25rem;">
+      ${statCard('UMKM Terdaftar', data.totalUsers, 'var(--cyan)')}
+      ${statCard('Rata-rata Skor ERS', data.avgErsScore !== null ? data.avgErsScore + '/100' : '—', 'var(--green)')}
+      ${statCard('ERS Selesai Dihitung', data.ersCompletedCount, 'var(--amber)')}
+      ${statCard('Total EOI Terkirim', data.totalEoiSent, '#a78bfa')}
+    </div>`;
+
+    const levels = data.readinessLevelBreakdown || {};
+    const totalLevels = Object.values(levels).reduce((a,b)=>a+b,0) || 1;
+    if (totalLevels > 0) {
+      html += '<div style="font-family:var(--fh);font-size:.8rem;font-weight:700;margin-bottom:.6rem;color:var(--cyan);">SEBARAN TINGKAT KESIAPAN</div>';
+      const colors = { 'Siap Ekspor':'var(--green)', 'Perlu Sedikit Perbaikan':'var(--cyan)', 'Perlu Persiapan':'var(--amber)', 'Belum Siap':'var(--red)' };
+      Object.entries(levels).forEach(([label, count]) => {
+        const pct = Math.round((count / totalLevels) * 100);
+        html += `<div style="margin-bottom:.6rem;">
+          <div style="display:flex;justify-content:space-between;font-size:.75rem;margin-bottom:.25rem;"><span>${label}</span><span style="color:var(--muted);">${count} (${pct}%)</span></div>
+          <div class="prog-wrap"><div class="prog-fill" style="width:${pct}%;background:${colors[label]||'var(--cyan)'};"></div></div>
+        </div>`;
+      });
+    }
+
+    const cats = data.categoryBreakdown || {};
+    const catEntries = Object.entries(cats).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    if (catEntries.length) {
+      html += '<div style="font-family:var(--fh);font-size:.8rem;font-weight:700;margin:1.25rem 0 .6rem;color:var(--cyan);">KATEGORI PRODUK TERBANYAK</div>';
+      catEntries.forEach(([cat, count]) => {
+        html += `<div style="display:flex;justify-content:space-between;padding:.5rem .75rem;background:rgba(255,255,255,.02);border-radius:.6rem;margin-bottom:.4rem;font-size:.78rem;"><span>${cat}</span><span style="color:var(--cyan);font-weight:700;">${count}</span></div>`;
+      });
+    }
+
+    html += `<div style="text-align:center;font-size:.62rem;color:rgba(255,255,255,.25);margin-top:1rem;">Data live dari Firestore · diperbarui ${new Date(data.generatedAt).toLocaleString('id')}</div>`;
+    el.innerHTML = html;
+  } catch (err) {
+    el.innerHTML = `<div style="text-align:center;padding:1.5rem 1rem;color:var(--muted);font-size:.82rem;">⚠ ${err.message || 'Gagal memuat data dampak'}</div>`;
+  }
+}
 
 function confirmDeleteData() {
   if (!confirm('Yakin ingin menghapus semua data? Tindakan ini tidak dapat dibatalkan.')) return;
