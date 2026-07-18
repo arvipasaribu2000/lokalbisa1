@@ -102,9 +102,9 @@ const PAGE_META = {
     title: 'AI Compliance Guide — LOKALBISA | Panduan Regulasi Ekspor',
     desc:  'Tanya AI tentang dokumen, sertifikasi, dan regulasi bea cukai ke 8 negara tujuan ekspor Indonesia.',
   },
-  buyers: {
+  matching: {
     title: 'Smart Buyer Matching — LOKALBISA | Temukan Importir Internasional',
-    desc:  '24+ buyer terverifikasi dari 12 negara siap temui produk UMKM Indonesia. Filter by kategori & negara.',
+    desc:  '24 buyer terkurasi dari 14 negara siap temui produk UMKM Indonesia. Filter by kategori & negara.',
   },
   profile: {
     title: 'Profil UMKM — LOKALBISA | Kelola Data Bisnis Ekspor',

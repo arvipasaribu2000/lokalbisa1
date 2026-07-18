@@ -611,7 +611,7 @@ select.form-input option{background:var(--surface2);color:var(--white);}
       <div class="onboard-slide">
         <div class="onboard-icon">🌐</div>
         <div class="onboard-title">Temukan <span>Buyer Internasional</span> yang Tepat</div>
-        <div class="onboard-desc">AI kami mencocokkan produkmu dengan 200+ buyer internasional terverifikasi berdasarkan kapasitas, sertifikasi, dan kecocokan pasar. Template proposal Bahasa Inggris sudah disiapkan!</div>
+        <div class="onboard-desc">Sistem kami mencocokkan produkmu dengan buyer internasional terkurasi berdasarkan kapasitas, sertifikasi, dan kecocokan pasar. Template proposal Bahasa Inggris sudah disiapkan!</div>
       </div>
       <!-- Slide 4 -->
       <div class="onboard-slide">
@@ -795,12 +795,12 @@ select.form-input option{background:var(--surface2);color:var(--white);}
     </div>
     <div class="activity-item">
       <div class="activity-icon ai-green">🤖</div>
-      <div><div class="activity-title">AI Compliance Guide Aktif</div><div class="activity-desc">Tanya regulasi ekspor 10+ negara dalam Bahasa Indonesia</div></div>
+      <div><div class="activity-title">AI Compliance Guide Aktif</div><div class="activity-desc">Tanya regulasi ekspor ke 8 negara tujuan dalam Bahasa Indonesia</div></div>
       <div class="activity-time">Aktif</div>
     </div>
     <div class="activity-item">
       <div class="activity-icon ai-amber">🌐</div>
-      <div><div class="activity-title">200+ Buyer Siap Dicocokkan</div><div class="activity-desc">Lengkapi profil untuk akses Smart Buyer Matching</div></div>
+      <div><div class="activity-title">24 Buyer Siap Dicocokkan</div><div class="activity-desc">Lengkapi profil untuk akses Smart Buyer Matching</div></div>
       <div class="activity-time">Siap</div>
     </div>
     <div style="height:1rem;"></div>
@@ -1085,7 +1085,7 @@ select.form-input option{background:var(--surface2);color:var(--white);}
     <div class="msg-wrap ai">
       <div class="msg-bubble">
         Halo! Saya <b>AI Compliance Guide LOKALBISA</b> 🤖<br><br>
-        Saya siap menjawab pertanyaan kamu tentang regulasi ekspor ke <b>10+ negara</b> dalam <b>Bahasa Indonesia</b>.<br><br>
+        Saya siap menjawab pertanyaan kamu tentang regulasi ekspor ke <b>8 negara tujuan</b> dalam <b>Bahasa Indonesia</b>.<br><br>
         Negara yang dipilih: <b id="selected-country-display" style="color:var(--cyan);">🇯🇵 Jepang</b><br><br>
         Tanya apa saja tentang:<br>
         • Dokumen ekspor yang dibutuhkan<br>
@@ -1126,7 +1126,7 @@ select.form-input option{background:var(--surface2);color:var(--white);}
     <button class="back-btn" onclick="navigateTo('home')">←</button>
     <div class="page-title">Smart Buyer Matching</div>
     <div class="spacer"></div>
-    <span class="badge badge-a">200+ Buyer</span>
+    <span class="badge badge-a">24 Buyer</span>
   </div>
   <div class="content">
     <!-- Match score summary -->
@@ -1416,9 +1416,18 @@ function checkPassStrength(val) {
   label.style.color = colors[score] || 'var(--muted)';
 }
 
-async function hashPassword(password) {
-  const salt = 'lokalbisa_salt_v1'; // static salt untuk demo; production pakai random salt per user
-  const enc = new TextEncoder().encode(password + salt);
+// Salt statis lama — HANYA dipertahankan supaya akun yang dibuat sebelum
+// perbaikan ini (pwHash tanpa field `salt` tersimpan) tetap bisa login.
+// Akun baru selalu pakai salt acak per-user, jauh lebih aman dari rainbow-table.
+const LEGACY_STATIC_SALT = 'lokalbisa_salt_v1';
+
+function generateSalt() {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPassword(password, salt) {
+  const enc = new TextEncoder().encode(password + (salt || LEGACY_STATIC_SALT));
   const buf = await crypto.subtle.digest('SHA-256', enc);
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
@@ -1479,9 +1488,10 @@ async function doRegister() {
 }
 
 function finishRegistration({ name, biz, cat, phoneClean, pass }) {
-  hashPassword(pass).then(pwHash => {
+  const salt = generateSalt();
+  hashPassword(pass, salt).then(pwHash => {
     const existing = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
-    existing[phoneClean] = { pwHash, name, biz, cat, joinDate: new Date().toLocaleDateString('id') };
+    existing[phoneClean] = { pwHash, salt, name, biz, cat, joinDate: new Date().toLocaleDateString('id') };
     localStorage.setItem('lokalbisa_accounts', JSON.stringify(existing));
 
     APP.user = { name, biz, cat, phone: phoneClean, joinDate: existing[phoneClean].joinDate };
@@ -1571,7 +1581,7 @@ async function doLogin() {
   }
 
   try {
-    const pwHash = await hashPassword(pass);
+    const pwHash = await hashPassword(pass, acc.salt || LEGACY_STATIC_SALT);
     if (pwHash !== acc.pwHash) {
       showToast('⚠ Password salah, coba lagi');
       document.getElementById('log-pass').value = '';
@@ -2242,13 +2252,38 @@ async function fetchComplianceAnswer(question, country, history = []) {
   }
 }
 
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function sanitizeReplyHtml(html) {
+  const allowedTags = ['B','BR','I','U','SPAN'];
+  const temp = document.createElement('div');
+  temp.innerHTML = html;
+  (function walk(node) {
+    [...node.childNodes].forEach(child => {
+      if (child.nodeType === 1) {
+        if (!allowedTags.includes(child.tagName)) {
+          child.replaceWith(document.createTextNode(child.textContent));
+          return;
+        }
+        [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
+        walk(child);
+      }
+    });
+  })(temp);
+  return temp.innerHTML;
+}
+
 function appendMsg(type, text, cite, confidence) {
   const msgs = document.getElementById('chat-messages');
   const wrap = document.createElement('div');
   wrap.className = 'msg-wrap ' + type;
   const bubble = document.createElement('div');
   bubble.className = 'msg-bubble';
-  bubble.innerHTML = text;
+  bubble.innerHTML = type === 'user' ? escapeHtml(text) : sanitizeReplyHtml(text);
   wrap.appendChild(bubble);
   if(cite) {
     const citeEl = document.createElement('div');
@@ -2363,11 +2398,39 @@ const BUYERS = [
   { id:24, flag:'🇸🇦', name:'Madinah Fashion House', cat:'Retailer Fashion Muslim · Madinah, Arab Saudi', score:85, moq:'200 pcs', category:'fashion halal', payment:'L/C 30 days', cert:['Halal','SASO'], tags:['Modest Fashion','SASO','Pilgrim Market'], desc:'Retailer fashion muslim yang melayani pasar jamaah haji/umrah dan lokal Arab Saudi. Sangat tertarik dengan batik dan tenun bermotif islami modern.' },
 ];
 
+/* ═══ MATCH SCORE — dihitung per user, bukan angka tetap ═══
+   Kombinasi 3 faktor: (1) baseline kurasi buyer, (2) kecocokan kategori
+   produk user vs kategori buyer, (3) kecocokan skor ERS user dengan
+   tingkat tuntutan sertifikasi buyer. Field `score` di data BUYERS
+   dipakai sebagai baseline kurasi, BUKAN skor akhir yang ditampilkan. */
+function calculateMatchScore(buyer) {
+  let score = buyer.score * 0.45;
+
+  const catMap = { fashion:'fashion', craft:'craft', food:'food', furniture:'furniture', cosmetic:'cosmetic', agri:'organic', digital:'digital', creative:'creative' };
+  const userCatKeyword = APP.user ? catMap[APP.user.cat] : null;
+  if (userCatKeyword && buyer.category.includes(userCatKeyword)) score += 28;
+  else if (!APP.user) score += 14;
+  else score += 6;
+
+  const ers = APP.ersScore;
+  if (ers !== null && ers !== undefined && !isNaN(ers)) {
+    const certDemand = buyer.cert.length;
+    const ersFit = certDemand === 0 ? 20 : Math.max(0, 20 - Math.abs(ers - (50 + certDemand * 10)) / 4);
+    score += ersFit;
+  } else {
+    score += 8;
+  }
+
+  return Math.max(35, Math.min(98, Math.round(score)));
+}
+
 function renderBuyers(filtered) {
   const list = document.getElementById('buyer-list');
   list.innerHTML = '';
   document.getElementById('match-count').textContent = filtered.length + ' buyer';
-  filtered.forEach(b => {
+  const sorted = [...filtered].sort((a, b) => calculateMatchScore(b) - calculateMatchScore(a));
+  sorted.forEach(b => {
+    const matchScore = calculateMatchScore(b);
     const div = document.createElement('div');
     div.className = 'buyer-card';
     div.innerHTML = `
@@ -2377,7 +2440,7 @@ function renderBuyers(filtered) {
           <div class="buyer-name">${b.name}</div>
           <div class="buyer-cat">${b.cat}</div>
         </div>
-        <div class="match-pct">${b.score}%</div>
+        <div class="match-pct">${matchScore}%</div>
       </div>
       <div class="buyer-mid">
         <div class="buyer-stats">
@@ -2408,7 +2471,7 @@ function openBuyerModal(id, e) {
   document.getElementById('modal-flag').textContent = b.flag;
   document.getElementById('modal-name').textContent = b.name;
   document.getElementById('modal-cat').textContent = b.cat;
-  document.getElementById('modal-score').textContent = 'Match Score: ' + b.score + '%';
+  document.getElementById('modal-score').textContent = 'Match Score: ' + calculateMatchScore(b) + '%';
   document.getElementById('modal-body').innerHTML = `
     <div class="form-group">
       <div style="font-family:var(--fm);font-size:.65rem;color:var(--cyan);letter-spacing:1.5px;margin-bottom:.6rem;">TENTANG BUYER</div>
@@ -2543,7 +2606,7 @@ if(savedEOI) APP.eoi = JSON.parse(savedEOI);
     <div style="font-size:.75rem;color:var(--muted);margin-top:.25rem;">Batalkan kapan saja</div>
   </div>
   <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1.25rem;">
-    ${['✅ ERS Assessment tidak terbatas','✅ Chat AI Compliance Guide tidak terbatas (100+ pertanyaan/bulan)','✅ Priority Buyer Matching — akses ke 200+ buyer eksklusif','✅ Export Roadmap personal dengan mentor virtual','✅ Notifikasi peluang buyer baru real-time','✅ Badge "UMKM Ekspor Terverifikasi" di profil','✅ Dukungan prioritas via WhatsApp'].map(f=>`<div style="font-size:.85rem;color:rgba(255,255,255,.85);">${f}</div>`).join('')}
+    ${['✅ ERS Assessment tidak terbatas','✅ Chat AI Compliance Guide tidak terbatas (100+ pertanyaan/bulan)','✅ Priority Buyer Matching — notifikasi lebih awal saat ada buyer baru masuk','✅ Export Roadmap personal dengan mentor virtual','✅ Notifikasi peluang buyer baru real-time','✅ Badge "UMKM Ekspor Terverifikasi" di profil','✅ Dukungan prioritas via WhatsApp'].map(f=>`<div style="font-size:.85rem;color:rgba(255,255,255,.85);">${f}</div>`).join('')}
   </div>
   <button class="btn-primary" style="background:linear-gradient(135deg,#FFD700,#FFA500);color:#020B18;" onclick="showToast('🚀 Fitur pembayaran segera hadir! Hubungi kami via WhatsApp untuk early access.');closeProfileModal();">⭐ Mulai Premium Sekarang</button>
   <div style="text-align:center;margin-top:.75rem;font-size:.7rem;color:var(--muted);">Pertanyaan? Chat kami di WhatsApp</div>
@@ -2648,6 +2711,17 @@ if(savedEOI) APP.eoi = JSON.parse(savedEOI);
       <input class="form-input" id="fg-name" placeholder="Sesuai saat pendaftaran"></div>
     <button class="btn-primary" onclick="verifyForgotIdentity()" style="margin-top:.5rem;">Verifikasi →</button>
   </div>
+  <div id="forgot-step-otp" style="display:none;">
+    <div style="font-size:.8rem;color:var(--muted);margin-bottom:1rem;line-height:1.6;">
+      Kode 6 digit dikirim ke WhatsApp <b id="fg-otp-phone" style="color:#fff;"></b>. Masukkan di bawah ini untuk melanjutkan reset password.
+    </div>
+    <div class="form-group">
+      <label class="form-label">Kode OTP</label>
+      <input class="form-input" type="text" inputmode="numeric" maxlength="6" id="fg-otp-code" placeholder="123456" style="letter-spacing:.4em;font-size:1.2rem;text-align:center;">
+    </div>
+    <button class="btn-primary" onclick="verifyForgotOtp()" style="margin-top:.5rem;">Verifikasi Kode →</button>
+    <button onclick="resendForgotOtp()" style="width:100%;margin-top:.75rem;font-size:.78rem;color:var(--cyan);background:none;border:none;cursor:pointer;">Kirim ulang kode</button>
+  </div>
   <div id="forgot-step-reset" style="display:none;">
     <div style="font-size:.8rem;color:var(--green);margin-bottom:1rem;">✓ Identitas terverifikasi. Buat password baru.</div>
     <div class="form-group"><label class="form-label">Password Baru</label>
@@ -2657,19 +2731,27 @@ if(savedEOI) APP.eoi = JSON.parse(savedEOI);
 </div>
 
 <script>
-/* ═══ FORGOT PASSWORD (verifikasi lokal: nomor WA + nama) ═══ */
+/* ═══ FORGOT PASSWORD ═══
+   Nomor WA + nama itu cuma pre-check identitas awal (data yang relatif publik,
+   BUKAN faktor keamanan utama). Kalau backend/OTP WhatsApp aktif, reset password
+   WAJIB verifikasi kepemilikan nomor via kode OTP dulu sebelum bisa ganti password
+   — supaya orang lain yang kebetulan tau nama+nomor kamu gak bisa ambil alih akun.
+   Kalau backend belum di-deploy, fallback ke verifikasi nama+nomor saja (mode demo,
+   kurang aman, tapi supaya fitur ini tetap bisa dipakai tanpa backend). */
 let forgotPhoneClean = null;
 function forgotPassword() {
   document.getElementById('fg-phone').value = '';
   document.getElementById('fg-name').value = '';
+  document.getElementById('fg-otp-code').value = '';
   document.getElementById('fg-newpass').value = '';
   document.getElementById('forgot-step-verify').style.display = '';
+  document.getElementById('forgot-step-otp').style.display = 'none';
   document.getElementById('forgot-step-reset').style.display = 'none';
   document.getElementById('modal-overlay').style.display = 'block';
   document.getElementById('modal-forgot').style.display = 'block';
   document.body.style.overflow = 'hidden';
 }
-function verifyForgotIdentity() {
+async function verifyForgotIdentity() {
   const phone = document.getElementById('fg-phone').value.trim().replace(/[\s-]/g,'');
   const name = document.getElementById('fg-name').value.trim().toLowerCase();
   if (!phone || !name) { showToast('⚠ Lengkapi nomor WhatsApp dan nama'); return; }
@@ -2680,8 +2762,63 @@ function verifyForgotIdentity() {
     return;
   }
   forgotPhoneClean = phone;
-  document.getElementById('forgot-step-verify').style.display = 'none';
-  document.getElementById('forgot-step-reset').style.display = '';
+
+  if (!BACKEND_BASE_URL) {
+    // Tidak ada backend OTP tersedia → lanjut ke reset langsung (mode demo)
+    document.getElementById('forgot-step-verify').style.display = 'none';
+    document.getElementById('forgot-step-reset').style.display = '';
+    return;
+  }
+
+  try {
+    showToast('⏳ Mengirim kode verifikasi ke WhatsApp...');
+    const res = await fetch(BACKEND_BASE_URL + '/api/otp/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: forgotPhoneClean })
+    });
+    if (!res.ok) throw new Error((await res.json().catch(()=>({}))).error || 'Gagal mengirim OTP');
+    document.getElementById('fg-otp-phone').textContent = forgotPhoneClean;
+    document.getElementById('forgot-step-verify').style.display = 'none';
+    document.getElementById('forgot-step-otp').style.display = '';
+    showToast('✅ Kode OTP dikirim ke WhatsApp kamu');
+  } catch (err) {
+    // Backend/OTP tidak terjangkau → jangan kunci user, fallback ke mode demo
+    console.warn('OTP send gagal saat reset password, fallback ke verifikasi nama+nomor:', err.message);
+    showToast('⚠ Verifikasi WA tidak tersedia, lanjut dengan verifikasi identitas dasar');
+    document.getElementById('forgot-step-verify').style.display = 'none';
+    document.getElementById('forgot-step-reset').style.display = '';
+  }
+}
+async function verifyForgotOtp() {
+  const code = document.getElementById('fg-otp-code').value.trim();
+  if (!/^[0-9]{6}$/.test(code)) { showToast('⚠ Kode OTP harus 6 digit'); return; }
+  if (!forgotPhoneClean) { showToast('⚠ Sesi reset password berakhir, ulangi dari awal'); closeProfileModal(); return; }
+  try {
+    const res = await fetch(BACKEND_BASE_URL + '/api/otp/verify', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: forgotPhoneClean, code })
+    });
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok || !data.verified) { showToast('⚠ ' + (data.error || 'Kode salah, coba lagi')); return; }
+    document.getElementById('forgot-step-otp').style.display = 'none';
+    document.getElementById('forgot-step-reset').style.display = '';
+  } catch (err) {
+    showToast('⚠ Gagal verifikasi, cek koneksi internet kamu');
+  }
+}
+async function resendForgotOtp() {
+  if (!forgotPhoneClean) return;
+  try {
+    showToast('⏳ Mengirim ulang kode...');
+    const res = await fetch(BACKEND_BASE_URL + '/api/otp/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: forgotPhoneClean })
+    });
+    if (!res.ok) throw new Error();
+    showToast('✅ Kode baru dikirim ke WhatsApp');
+  } catch {
+    showToast('⚠ Gagal kirim ulang, coba lagi sebentar');
+  }
 }
 async function submitNewPassword() {
   const pass = document.getElementById('fg-newpass').value;
@@ -2690,7 +2827,9 @@ async function submitNewPassword() {
   if (!hasUpper && !hasNum) { showToast('⚠ Password harus mengandung huruf besar atau angka'); return; }
   const accounts = JSON.parse(localStorage.getItem('lokalbisa_accounts') || '{}');
   if (!forgotPhoneClean || !accounts[forgotPhoneClean]) { showToast('⚠ Sesi verifikasi berakhir, ulangi proses'); return; }
-  accounts[forgotPhoneClean].pwHash = await hashPassword(pass);
+  const newSalt = generateSalt();
+  accounts[forgotPhoneClean].pwHash = await hashPassword(pass, newSalt);
+  accounts[forgotPhoneClean].salt = newSalt;
   localStorage.setItem('lokalbisa_accounts', JSON.stringify(accounts));
   forgotPhoneClean = null;
   closeProfileModal();
